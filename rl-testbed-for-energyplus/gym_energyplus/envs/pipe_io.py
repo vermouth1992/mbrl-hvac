@@ -3,12 +3,13 @@
 # This project is licensed under the MIT License, see LICENSE
 
 import os
+
 from gym_energyplus.envs.Timeout import Timeout
 
+
 class PipeIo():
-    
     EXTCTRL_PIPE_DIR = "/tmp"
-    
+
     def __init__(self):
 
         self.extctrl_pipe_prefix = self.EXTCTRL_PIPE_DIR + "/extctrl_" + str(os.getpid())
@@ -27,14 +28,16 @@ class PipeIo():
             self.obs_pipe = None
         try:
             os.unlink(self.obs_pipe_filename)
-        except: pass
-        
+        except:
+            pass
+
         if (self.act_pipe is not None):
             self.act_pipe.close()
             self.act_pipe = None
         try:
             os.unlink(self.act_pipe_filename)
-        except: pass
+        except:
+            pass
 
     def start(self):
         os.mkfifo(self.obs_pipe_filename)
@@ -50,7 +53,7 @@ class PipeIo():
         if (self.obs_pipe is None):
             print('PipeIo.readline: Opening OBS pipe [{}]'.format(self.obs_pipe_filename))
             try:
-                with Timeout(1200): # Should be long enough to finish one episode for execution of non-RL model
+                with Timeout(1200):  # Should be long enough to finish one episode for execution of non-RL model
                     self.obs_pipe = open(self.obs_pipe_filename, 'r')
             except Timeout.Timeout:
                 print('Opening file {} timed out'.format(self.obs_pipe_filename))
@@ -64,7 +67,7 @@ class PipeIo():
                 break
         seq = int(items[0])
         val = float(items[1])
-        assert(self.obs_seq == seq)
+        assert (self.obs_seq == seq)
         self.obs_seq += 1
         return val
 
@@ -82,7 +85,7 @@ class PipeIo():
         self.act_pipe.write('{}\n'.format(line))
         self.act_seq += 1
         return False
-        
+
     def flush(self):
-        self.act_pipe.write('DELIMITER\n') # Send no-seq line as delimiter
+        self.act_pipe.write('DELIMITER\n')  # Send no-seq line as delimiter
         self.act_pipe.flush()

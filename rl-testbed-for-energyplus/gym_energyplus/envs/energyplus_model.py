@@ -2,19 +2,20 @@
 # Project name: Reinforcement Learning Testbed for Power Consumption Optimization
 # This project is licensed under the MIT License, see LICENSE
 
+import json
+import math
+import os
+import sys
+import time
 from abc import ABCMeta, abstractmethod
-import os, sys, time
-from scipy.special import expit
-import numpy as np
 from datetime import datetime, timedelta
 from glob import glob
-from matplotlib.widgets import Slider, Button, RadioButtons
-import datetime as dt
+
 import matplotlib.pyplot as plt
-import matplotlib
+import numpy as np
 import pandas as pd
-import math
-import json
+from matplotlib.widgets import Slider, Button
+
 
 class EnergyPlusModel(metaclass=ABCMeta):
 
@@ -48,8 +49,8 @@ class EnergyPlusModel(metaclass=ABCMeta):
         # Dirty hack
         if dstr[0] != ' ':
             dstr = ' ' + dstr
-        #year = 2017
-        year = 2013 # for CHICAGO_IL_USA TMY2-94846
+        # year = 2017
+        year = 2013  # for CHICAGO_IL_USA TMY2-94846
         month = int(dstr[1:3])
         day = int(dstr[4:6])
         hour = int(dstr[8:10])
@@ -68,25 +69,25 @@ class EnergyPlusModel(metaclass=ABCMeta):
         # ' MM/DD  HH:MM:SS'
         dates_new = []
         for d in dates:
-            #year = 2017
-            #month = int(d[1:3])
-            #day = int(d[4:6])
-            #hour = int(d[8:10])
-            #minute = int(d[11:13])
-            #sec = 0
-            #msec = 0
-            #if hour == 24:
+            # year = 2017
+            # month = int(d[1:3])
+            # day = int(d[4:6])
+            # hour = int(d[8:10])
+            # minute = int(d[11:13])
+            # sec = 0
+            # msec = 0
+            # if hour == 24:
             #    hour = 0
             #    d_new = datetime(year, month, day, hour, minute, sec, msec) + dt.timedelta(days=1)
-            #else:
+            # else:
             #    d_new = datetime(year, month, day, hour, minute, sec, msec)
-            #dates_new.append(d_new)
+            # dates_new.append(d_new)
             dates_new.append(self._parse_datetime(d))
         return dates_new
 
     # Generate x_pos and x_labels
     def generate_x_pos_x_labels(self, dates):
-        time_delta  = self._parse_datetime(dates[1]) - self._parse_datetime(dates[0])
+        time_delta = self._parse_datetime(dates[1]) - self._parse_datetime(dates[0])
         x_pos = []
         x_labels = []
         for i, d in enumerate(dates):
@@ -100,28 +101,33 @@ class EnergyPlusModel(metaclass=ABCMeta):
         # In TPRO/POP1/POP2 in baseline, action seems to be normalized to [-1.0, 1.0].
         # So it must be scaled back into action_space by the environment.
         self.action_prev = self.action
-        self.action = self.action_space.low + (normalized_action + 1.) * 0.5 * (self.action_space.high - self.action_space.low)
+        self.action = self.action_space.low + (normalized_action + 1.) * 0.5 * (
+                    self.action_space.high - self.action_space.low)
         self.action = np.clip(self.action, self.action_space.low, self.action_space.high)
 
     @abstractmethod
-    def setup_spaces(self): pass
+    def setup_spaces(self):
+        pass
 
     # Need to handle the case that raw_state is None
     @abstractmethod
-    def set_raw_state(self, raw_state): pass
+    def set_raw_state(self, raw_state):
+        pass
 
     def get_state(self):
         return self.format_state(self.raw_state)
 
     @abstractmethod
-    def compute_reward(self): pass
+    def compute_reward(self):
+        pass
 
     @abstractmethod
-    def format_state(self, raw_state): pass
+    def format_state(self, raw_state):
+        pass
 
-    #--------------------------------------------------
+    # --------------------------------------------------
     # Plotting staffs follow
-    #--------------------------------------------------
+    # --------------------------------------------------
     def plot(self, log_dir='', csv_file='', **kwargs):
         if log_dir is not '':
             if not os.path.isdir(log_dir):
@@ -209,7 +215,7 @@ class EnergyPlusModel(metaclass=ABCMeta):
         # Redraw all lines
         self.axprogress.lines = []
         self.axprogress.plot(self.reward, color='#1f77b4', label='Reward')
-        #self.axprogress.plot(self.reward_mean, color='#ff7f0e', label='Reward (average)')
+        # self.axprogress.plot(self.reward_mean, color='#ff7f0e', label='Reward (average)')
         self.axprogress.legend()
         # Redraw slider
         if self.sl_episode is None or int(round(self.sl_episode.val)) == self.num_episodes - 2:
@@ -217,8 +223,9 @@ class EnergyPlusModel(metaclass=ABCMeta):
         else:
             cur_ep = int(round(self.sl_episode.val))
         self.axslider.clear()
-        #self.sl_episode = Slider(self.axslider, 'Episode (0..{})'.format(self.num_episodes - 1), 0, self.num_episodes - 1, valinit=self.num_episodes - 1, valfmt='%6.0f')
-        self.sl_episode = Slider(self.axslider, 'Episode (0..{})'.format(self.num_episodes - 1), 0, self.num_episodes - 1, valinit=cur_ep, valfmt='%6.0f')
+        # self.sl_episode = Slider(self.axslider, 'Episode (0..{})'.format(self.num_episodes - 1), 0, self.num_episodes - 1, valinit=self.num_episodes - 1, valfmt='%6.0f')
+        self.sl_episode = Slider(self.axslider, 'Episode (0..{})'.format(self.num_episodes - 1), 0,
+                                 self.num_episodes - 1, valinit=cur_ep, valfmt='%6.0f')
         self.sl_episode.on_changed(self.set_episode_num)
 
     def read_monitor_file(self):
@@ -226,7 +233,8 @@ class EnergyPlusModel(metaclass=ABCMeta):
         if self.timestamp_csv is None:
             while not os.path.isfile(self.monitor_file):
                 time.sleep(1)
-            self.timestamp_csv = os.stat(self.monitor_file).st_mtime - 1 # '-1' is a hack to prevent losing the first set of data
+            self.timestamp_csv = os.stat(
+                self.monitor_file).st_mtime - 1  # '-1' is a hack to prevent losing the first set of data
 
         num_ep = 0
         ts = os.stat(self.monitor_file).st_mtime
@@ -238,7 +246,7 @@ class EnergyPlusModel(metaclass=ABCMeta):
             assert firstline.startswith('#')
             metadata = json.loads(firstline[1:])
             assert metadata['env_id'] == "EnergyPlus-v0"
-            assert set(metadata.keys()) == {'env_id', 't_start'},  "Incorrect keys in monitor metadata"
+            assert set(metadata.keys()) == {'env_id', 't_start'}, "Incorrect keys in monitor metadata"
             df = pd.read_csv(f, index_col=None)
             assert set(df.keys()) == {'l', 't', 'r'}, "Incorrect keys in monitor logline"
             f.close()
@@ -284,7 +292,9 @@ class EnergyPlusModel(metaclass=ABCMeta):
             self.sl_episode.set_val(ep)
 
     def show_statistics(self, title, series):
-        print('{:25} ave={:5,.2f}, min={:5,.2f}, max={:5,.2f}, std={:5,.2f}'.format(title, np.average(series), np.min(series), np.max(series), np.std(series)))
+        print('{:25} ave={:5,.2f}, min={:5,.2f}, max={:5,.2f}, std={:5,.2f}'.format(title, np.average(series),
+                                                                                    np.min(series), np.max(series),
+                                                                                    np.std(series)))
 
     def get_statistics(self, series):
         return np.average(series), np.min(series), np.max(series), np.std(series)
@@ -302,7 +312,7 @@ class EnergyPlusModel(metaclass=ABCMeta):
         print('    degree 0.0-0.9 0.0   0.1   0.2   0.3   0.4   0.5   0.6   0.7   0.8   0.9')
         print('    -------------------------------------------------------------------------')
         for t in range(170, 280, 10):
-            print('    {:4.1f}C {:5.1%}  '.format(t / 10.0, sum(dist[t:(t+10)]) / len(series)), end='')
+            print('    {:4.1f}C {:5.1%}  '.format(t / 10.0, sum(dist[t:(t + 10)]) / len(series)), end='')
             for tt in range(t, t + 10):
                 print(' {:5.1%}'.format(dist[tt] / len(series)), end='')
             print('')
@@ -316,7 +326,7 @@ class EnergyPlusModel(metaclass=ABCMeta):
                 print('energyplus_model.dump: {} is not a directory'.format(log_dir))
                 return
             print('energyplus_plot.dump: log={}'.format(log_dir))
-            #self.log_dir = log_dir
+            # self.log_dir = log_dir
 
             # Make a list of all episodes
             # Note: Somethimes csv file is missing in the episode directories
@@ -326,19 +336,23 @@ class EnergyPlusModel(metaclass=ABCMeta):
             self.episode_dirs = list(set([os.path.dirname(i) for i in csv_list]))
             self.episode_dirs.sort()
             self.num_episodes = len(self.episode_dirs)
-        else: #csv_file != ''
-            self.episode_dirs = [ os.path.dirname(csv_file) ]
+        else:  # csv_file != ''
+            self.episode_dirs = [os.path.dirname(csv_file)]
             self.num_episodes = len(self.episode_dirs)
 
     # Model dependent methods
     @abstractmethod
-    def read_episode(self, ep): pass
+    def read_episode(self, ep):
+        pass
 
     @abstractmethod
-    def plot_episode(self, ep): pass
+    def plot_episode(self, ep):
+        pass
 
     @abstractmethod
-    def dump_timesteps(self, log_dir='', csv_file='', **kwargs): pass
+    def dump_timesteps(self, log_dir='', csv_file='', **kwargs):
+        pass
 
     @abstractmethod
-    def dump_episodes(self, log_dir='', csv_file='', **kwargs): pass
+    def dump_episodes(self, log_dir='', csv_file='', **kwargs):
+        pass

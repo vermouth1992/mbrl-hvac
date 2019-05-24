@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Specify the top directory
 TOP=./
 export PYTHONPATH=${PYTHONPATH}:${TOP}

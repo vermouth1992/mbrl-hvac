@@ -102,7 +102,7 @@ class EnergyPlusModel(metaclass=ABCMeta):
         # So it must be scaled back into action_space by the environment.
         self.action_prev = self.action
         self.action = self.action_space.low + (normalized_action + 1.) * 0.5 * (
-                    self.action_space.high - self.action_space.low)
+                self.action_space.high - self.action_space.low)
         self.action = np.clip(self.action, self.action_space.low, self.action_space.high)
 
     @abstractmethod

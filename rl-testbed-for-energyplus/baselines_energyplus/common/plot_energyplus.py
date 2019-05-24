@@ -4,7 +4,7 @@ import argparse
 import os
 
 from baselines_energyplus.common.energyplus_util import make_energyplus_env, energyplus_locate_log_dir
-import gym_energyplus
+
 
 def plot_energyplus_arg_parser():
     """
@@ -17,6 +17,7 @@ def plot_energyplus_arg_parser():
     parser.add_argument('--dump-timesteps', '-d', help='Dump timesteps', action='store_true')
     parser.add_argument('--dump-episodes', '-D', help='Dump episodes', action='store_true')
     return parser
+
 
 def energyplus_plot(env_id, log_dir='', csv_file='', dump_timesteps=False, dump_episodes=False):
     if log_dir is not '' and csv_file is not '':
@@ -34,9 +35,12 @@ def energyplus_plot(env_id, log_dir='', csv_file='', dump_timesteps=False, dump_
         env.env.plot(log_dir=log_dir, csv_file=csv_file)
     env.close()
 
+
 def main():
     args = plot_energyplus_arg_parser().parse_args()
-    energyplus_plot(args.env, log_dir=args.log_dir, csv_file=args.csv_file, dump_timesteps=args.dump_timesteps, dump_episodes=args.dump_episodes)
+    energyplus_plot(args.env, log_dir=args.log_dir, csv_file=args.csv_file, dump_timesteps=args.dump_timesteps,
+                    dump_episodes=args.dump_episodes)
+
 
 if __name__ == '__main__':
     main()

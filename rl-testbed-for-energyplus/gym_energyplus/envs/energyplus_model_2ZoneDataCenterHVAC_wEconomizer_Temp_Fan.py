@@ -179,6 +179,23 @@ class EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan(EnergyPlusModel):
             Whole_Building_Power_weight=1 / 100000.,
             raw_state=raw_state)
 
+    @staticmethod
+    def cost_fn(states, actions, next_states):
+        pass
+
+    @staticmethod
+    def constraint_fn(states):
+        """ Return the constraint violation given states. Constraint violations must be positive so that
+        if a trajectory has constraint zero, it must be the best one.
+
+        Args:
+            states: (batch_size, ob_dim)
+
+        Returns: (batch_size, constrain_dim)
+
+        """
+        pass
+
     def compute_reward_common(self,
                               temperature_center=22.5,
                               temperature_tolerance=0.5,

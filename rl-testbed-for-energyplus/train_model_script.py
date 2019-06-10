@@ -108,7 +108,7 @@ def train(window_length):
     trainer.fit(train_data_loader=train_data_loader, epochs=150, val_data_loader=val_data_loader,
                 model_path=checkpoint_path)
 
-    np.savez_compressed('data/lstm_attention_{}_stats.npz'.format(window_length),
+    np.savez_compressed('checkpoint/lstm_attention_{}_stats.npz'.format(window_length),
                         state_mean=state_mean,
                         state_std=state_std,
                         action_mean=action_mean,

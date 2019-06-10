@@ -103,10 +103,18 @@ def train(window_length):
     # define trainer
     trainer = Trainer(model, optimizer, loss, metrics=None, scheduler=scheduler)
 
-    checkpoint_path = 'checkpoint/lstm_attention.th'
+    checkpoint_path = 'checkpoint/lstm_attention_{}.th'.format(window_length)
 
     trainer.fit(train_data_loader=train_data_loader, epochs=150, val_data_loader=val_data_loader,
                 model_path=checkpoint_path)
+
+    np.savez_compressed('data/lstm_attention_{}_stats.npz'.format(window_length),
+                        state_mean=state_mean,
+                        state_std=state_std,
+                        action_mean=action_mean,
+                        action_std=action_std,
+                        delta_state_mean=delta_state_mean,
+                        delta_state_std=delta_state_std)
 
 
 def make_parser():
@@ -114,6 +122,7 @@ def make_parser():
     parser = ArgumentParser()
     parser.add_argument('action', choices=['gather', 'train'])
     parser.add_argument('--window_length', type=int, default=10)
+    parser.add_argument('--city', type=str, default='sf')
     return parser
 
 
@@ -123,6 +132,6 @@ if __name__ == '__main__':
     pprint.pprint(args)
 
     if args['action'] == 'gather':
-        gather_dataset()
+        gather_dataset(city=args['city'])
     else:
         train(args['window_length'])

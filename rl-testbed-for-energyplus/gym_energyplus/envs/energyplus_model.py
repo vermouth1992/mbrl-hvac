@@ -100,6 +100,7 @@ class EnergyPlusModel(metaclass=ABCMeta):
     def set_action(self, normalized_action):
         # In TPRO/POP1/POP2 in baseline, action seems to be normalized to [-1.0, 1.0].
         # So it must be scaled back into action_space by the environment.
+        assert normalized_action.shape == self.action_space.low.shape, 'Invalid action {}'.format(normalized_action)
         self.action_prev = self.action
         self.action = self.action_space.low + (normalized_action + 1.) * 0.5 * (
                 self.action_space.high - self.action_space.low)

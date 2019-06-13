@@ -53,8 +53,8 @@ def create_dataset(state, action, window_length=10):
     return state_x, action_x, delta_state_y
 
 
-def train(window_length):
-    data_0 = np.load('data/random_data_temp_fan_sf_0.npz')
+def train(window_length, city):
+    data_0 = np.load('data/random_data_temp_fan_{}_0.npz'.format(city))
     state = data_0['state']
     action = data_0['action']
 
@@ -103,12 +103,12 @@ def train(window_length):
     # define trainer
     trainer = Trainer(model, optimizer, loss, metrics=None, scheduler=scheduler)
 
-    checkpoint_path = 'checkpoint/lstm_attention_{}.th'.format(window_length)
+    checkpoint_path = 'checkpoint/lstm_attention_{}_{}.th'.format(window_length, city)
 
     trainer.fit(train_data_loader=train_data_loader, epochs=150, val_data_loader=val_data_loader,
                 model_path=checkpoint_path)
 
-    np.savez_compressed('checkpoint/lstm_attention_{}_stats.npz'.format(window_length),
+    np.savez_compressed('checkpoint/lstm_attention_{}_{}_stats.npz'.format(window_length, city),
                         state_mean=state_mean,
                         state_std=state_std,
                         action_mean=action_mean,
@@ -134,4 +134,4 @@ if __name__ == '__main__':
     if args['action'] == 'gather':
         gather_dataset(city=args['city'])
     else:
-        train(args['window_length'])
+        train(args['window_length'], args['city'])

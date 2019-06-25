@@ -17,12 +17,19 @@ class EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan(EnergyPlusModel):
     def __init__(self,
                  model_file,
                  log_dir,
+                 config=None,
                  verbose=False):
         super(EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan, self).__init__(model_file, log_dir, verbose)
         self.reward_low_limit = -10000.
         self.axepisode = None
         self.num_axes = 5
         self.text_power_consumption = []
+
+        if config is None:
+            config = {}
+
+        self.temperature_center = config.get('temp_center', 23.5)
+        self.temperature_tolerance = config.get('temp_tolerance', 0.5)
 
         self.electric_powers = [
             # 'Whole Building:Facility Total Electric Demand Power [W](Hourly)', # very high
@@ -97,8 +104,8 @@ class EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan(EnergyPlusModel):
 
     def compute_reward_center23_5_gaussian1_0_trapezoid0_1_pue0_0(self, raw_state=None):  # gaussian/trapezoid, PUE
         return self.compute_reward_common(
-            temperature_center=23.5,
-            temperature_tolerance=0.5,
+            temperature_center=self.temperature_center,
+            temperature_tolerance=self.temperature_tolerance,
             temperature_gaussian_weight=1.0,
             temperature_gaussian_sharpness=0.5,
             temperature_trapezoid_weight=0.1,
@@ -178,23 +185,6 @@ class EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan(EnergyPlusModel):
             PUE_weight=0.0,  # PUE not used
             Whole_Building_Power_weight=1 / 100000.,
             raw_state=raw_state)
-
-    @staticmethod
-    def cost_fn(states, actions, next_states):
-        pass
-
-    @staticmethod
-    def constraint_fn(states):
-        """ Return the constraint violation given states. Constraint violations must be positive so that
-        if a trajectory has constraint zero, it must be the best one.
-
-        Args:
-            states: (batch_size, ob_dim)
-
-        Returns: (batch_size, constrain_dim)
-
-        """
-        pass
 
     def compute_reward_common(self,
                               temperature_center=22.5,

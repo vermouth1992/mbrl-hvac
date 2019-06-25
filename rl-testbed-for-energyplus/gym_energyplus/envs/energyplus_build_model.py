@@ -13,11 +13,12 @@ from gym_energyplus.envs.energyplus_model_2ZoneDataCenterHVAC_wEconomizer_Temp_F
     EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan
 
 
-def build_ep_model(model_file, log_dir, verbose=False):
+def build_ep_model(model_file, log_dir, config=None, verbose=False):
     model_basename = os.path.splitext(os.path.basename(model_file))[0]
 
     if match('2ZoneDataCenterHVAC_wEconomizer_Temp_Fan.*', model_basename):
         model = EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan(model_file=model_file, log_dir=log_dir,
+                                                                        config=config,
                                                                         verbose=verbose)
     elif match('2ZoneDataCenterHVAC_wEconomizer_Temp.*', model_basename):
         model = EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp(model_file=model_file, log_dir=log_dir,

@@ -90,7 +90,7 @@ def train(window_length, city):
     val_data_loader = create_tuple_data_loader(((state_x_val, action_x_val), (delta_state_y_val,)))
 
     # define model
-    from model.model import LSTMAttention
+    from agent.model import LSTMAttention
 
     model = LSTMAttention(state_dim=state.shape[-1], action_dim=action.shape[-1], hidden_size=32)
 

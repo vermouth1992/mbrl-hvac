@@ -1,5 +1,8 @@
+import os
+import shutil
+
 import numpy as np
-from torchlib.deep_rl import RandomAgent
+from torchlib.deep_rl import BaseAgent
 from torchlib.utils.random.sampler import UniformSampler
 
 from agent.agent import VanillaAgent
@@ -11,21 +14,63 @@ from gym_energyplus.path import get_model_filepath, get_weather_filepath, energy
 from gym_energyplus.wrappers import RepeatAction, EnergyPlusWrapper, Monitor
 
 
+class PIDAgent(BaseAgent):
+    def __init__(self, target, sensitivity=1.0, alpha=0.4):
+        self.sensitivity = sensitivity
+        self.act_west_prev = target
+        self.act_east_prev = target
+        self.alpha = alpha
+        self.target = target
+
+        self.lo = 10.0
+        self.hi = 40.0
+        self.flow_hi = 7.0
+        self.flow_lo = self.flow_hi * 0.25
+
+        self.default_flow = self.flow_hi
+
+        self.low = np.array([self.lo, self.lo, self.flow_lo, self.flow_lo])
+        self.high = np.array([self.hi, self.hi, self.flow_hi, self.flow_hi])
+
+    def normalize_action(self, action):
+        action = ((action - self.low) / (self.high - self.low) - 0.5) * 2.
+        return action
+
+    def predict(self, state):
+        delta_west = state[1] - self.target
+        act_west = self.target - delta_west * self.sensitivity
+        act_west = act_west * self.alpha + self.act_west_prev * (1 - self.alpha)
+        self.act_west_prev = act_west
+
+        delta_east = state[2] - self.target
+        act_east = self.target - delta_east * self.sensitivity
+        act_east = act_east * self.alpha + self.act_east_prev * (1 - self.alpha)
+        self.act_east_prev = act_east
+
+        act_west = max(self.lo, min(act_west, self.hi))
+        act_east = max(self.lo, min(act_east, self.hi))
+        action = np.array([act_west, act_east, self.default_flow, self.default_flow])
+        return self.normalize_action(action)
+
+
 def train(city='sf',
           temperature_center=22.5,
           temp_tolerance=0.5,
           window_length=20,
-          dataset_maxlen=96 * 5 * 4,
-          num_init_random_rollouts=2,
-          max_rollout_length=96 * 5,  # each
+          num_days_per_episodes=5,
+          num_init_random_rollouts=2,  # 10 days as initial period
+          num_on_policy_rollouts=2,  # 10 days as grace period, indicated as data distribution shift
+          num_years=3,
           mpc_horizon=15,
           num_random_action_selection=4096,
-          num_on_policy_iters=365 // 5 * 3,
-          num_on_policy_rollouts=2,   #
           training_epochs=60,
-          training_batch_size=64,
+          training_batch_size=128,
           verbose=True,
           checkpoint_path=None):
+    dataset_maxlen = 96 * num_days_per_episodes * 56  # the dataset contains 8 weeks of historical data
+    max_rollout_length = 96 * num_days_per_episodes  # each episode is n days
+    num_on_policy_iters = 365 // num_days_per_episodes * num_years  # run for 3 years
+
     env = EnergyPlusEnv(energyplus_file=energyplus_bin_path,
                         model_file=get_model_filepath('temp_fan'),
                         weather_file=get_weather_filepath(city),
@@ -33,12 +78,19 @@ def train(city='sf',
                         log_dir=None,
                         verbose=True)
     env = RepeatAction(env)
-    env = Monitor(env, log_dir='runs/{}_{}_{}_{}_{}_{}'.format(city, temperature_center, temp_tolerance,
-                                                         window_length, mpc_horizon, num_random_action_selection))
+
+    log_dir = 'runs/{}_{}_{}_{}_{}_{}_{}_{}_model_based'.format(city, temperature_center, temp_tolerance,
+                                                                window_length, mpc_horizon,
+                                                                num_random_action_selection,
+                                                                num_on_policy_rollouts,
+                                                                training_epochs)
+    if os.path.isdir(log_dir):
+        shutil.rmtree(log_dir)
+    env = Monitor(env, log_dir=log_dir)
     env = EnergyPlusWrapper(env, max_steps=max_rollout_length)
 
     # collect dataset using random policy
-    random_policy = RandomAgent(env.action_space)
+    random_policy = PIDAgent(target=temperature_center - 3.5)
     dataset = EpisodicHistoryDataset(maxlen=dataset_maxlen, window_length=window_length)
 
     print('Gathering initial dataset...')
@@ -81,3 +133,32 @@ def train(city='sf',
 
     if checkpoint_path:
         agent.save_checkpoint(checkpoint_path)
+
+
+if __name__ == '__main__':
+    city = 'sf'
+    temperature_center = 22.5
+    temp_tolerance = 0.5
+    window_length = 20
+    num_days_per_episodes = 5
+    num_init_random_rollouts = 2  # 10 days as initial period
+    num_on_policy_rollouts = 2  # 10 days as grace period, indicated as data distribution shift
+    num_years = 3
+    mpc_horizon = 15
+    num_random_action_selection = 4096
+    training_epochs = 60
+    training_batch_size = 128
+    train(city='sf',
+          temperature_center=22.5,
+          temp_tolerance=1.0,
+          window_length=15,
+          num_days_per_episodes=1,
+          num_init_random_rollouts=56,  # 56 days as initial period
+          num_on_policy_rollouts=2,  # 2 days as grace period, indicated as data distribution shift
+          num_years=3,
+          mpc_horizon=15,
+          num_random_action_selection=8192,
+          training_epochs=60,
+          training_batch_size=128,
+          verbose=True,
+          checkpoint_path=None)

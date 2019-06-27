@@ -60,7 +60,7 @@ class LSTMAttention(nn.Module):
 
 
 class EnergyPlusDynamicsModel(Model):
-    def __init__(self):
+    def __init__(self, state_dim=6, action_dim=4, hidden_size=32, learning_rate=1e-3):
         self.state_mean = None
         self.state_std = None
         self.action_mean = None
@@ -68,8 +68,8 @@ class EnergyPlusDynamicsModel(Model):
         self.delta_state_mean = None
         self.delta_state_std = None
 
-        self.dynamics_model = LSTMAttention(state_dim=6, action_dim=4, hidden_size=32)
-        self.optimizer = torch.optim.Adam(self.dynamics_model.parameters(), lr=1e-3)
+        self.dynamics_model = LSTMAttention(state_dim=state_dim, action_dim=action_dim, hidden_size=hidden_size)
+        self.optimizer = torch.optim.Adam(self.dynamics_model.parameters(), lr=learning_rate)
 
         if enable_cuda:
             self.dynamics_model.cuda()
@@ -86,6 +86,13 @@ class EnergyPlusDynamicsModel(Model):
         self.delta_state_mean = convert_numpy_to_tensor(initial_dataset.delta_state_mean)
         self.delta_state_std = convert_numpy_to_tensor(initial_dataset.delta_state_std)
 
+        self.state_mean = torch.unsqueeze(torch.unsqueeze(self.state_mean, dim=0), dim=0)
+        self.state_std = torch.unsqueeze(torch.unsqueeze(self.state_std, dim=0), dim=0)
+        self.action_mean = torch.unsqueeze(torch.unsqueeze(self.action_mean, dim=0), dim=0)
+        self.action_std = torch.unsqueeze(torch.unsqueeze(self.action_std, dim=0), dim=0)
+        self.delta_state_mean = torch.unsqueeze(self.delta_state_mean, dim=0)
+        self.delta_state_std = torch.unsqueeze(self.delta_state_std, dim=0)
+
     def fit_dynamic_model(self, dataset: Dataset, epoch=10, batch_size=128, verbose=False):
         t = range(epoch)
         if verbose:
@@ -93,15 +100,19 @@ class EnergyPlusDynamicsModel(Model):
 
         for i in t:
             losses = []
-            for states, actions, next_states in dataset.random_iterator(batch_size=batch_size):
+            for states, actions, delta_states in dataset.random_iterator(batch_size=batch_size):
                 # convert to tensor
                 states = move_tensor_to_gpu(states)
                 actions = move_tensor_to_gpu(actions)
-                next_states = move_tensor_to_gpu(next_states)
+                delta_states = move_tensor_to_gpu(delta_states)
                 # calculate loss
                 self.optimizer.zero_grad()
-                predicted_next_states = self.predict_next_states(states, actions)
-                loss = F.mse_loss(predicted_next_states, next_states)
+                states_normalized = normalize(states, self.state_mean, self.state_std)
+                if not self.dynamics_model.discrete:
+                    actions = normalize(actions, self.action_mean, self.action_std)
+                delta_states_normalized = normalize(delta_states, self.delta_state_mean, self.delta_state_std)
+                predicted_delta_state_normalized = self.dynamics_model.forward(states_normalized, actions)
+                loss = F.mse_loss(predicted_delta_state_normalized, delta_states_normalized)
                 loss.backward()
                 self.optimizer.step()
                 losses.append(loss.item())
@@ -119,20 +130,14 @@ class EnergyPlusDynamicsModel(Model):
 
         """
         assert self.state_mean is not None, 'Please set statistics before training for inference.'
-        state_mean = torch.unsqueeze(torch.unsqueeze(self.state_mean, dim=0), dim=0)
-        state_std = torch.unsqueeze(torch.unsqueeze(self.state_std, dim=0), dim=0)
-
-        states_normalized = normalize(states, state_mean, state_std)
+        states_normalized = normalize(states, self.state_mean, self.state_std)
 
         if not self.dynamics_model.discrete:
-            action_mean = torch.unsqueeze(torch.unsqueeze(self.action_mean, dim=0), dim=0)
-            action_std = torch.unsqueeze(torch.unsqueeze(self.action_std, dim=0), dim=0)
-            actions = normalize(actions, action_mean, action_std)
+            actions = normalize(actions, self.action_mean, self.action_std)
 
         predicted_delta_state_normalized = self.dynamics_model.forward(states_normalized, actions)
-        delta_state_mean = torch.unsqueeze(self.delta_state_mean, dim=0)
-        delta_state_std = torch.unsqueeze(self.delta_state_std, dim=0)
-        predicted_delta_state = unnormalize(predicted_delta_state_normalized, delta_state_mean, delta_state_std)
+        predicted_delta_state = unnormalize(predicted_delta_state_normalized, self.delta_state_mean,
+                                            self.delta_state_std)
         return states[:, -1, :] + predicted_delta_state
 
     def state_dict(self):

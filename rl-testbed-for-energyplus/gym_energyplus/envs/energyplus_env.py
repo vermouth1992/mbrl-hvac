@@ -9,7 +9,9 @@ from argparse import ArgumentParser
 from glob import glob
 
 import numpy as np
+import torch
 from gym.utils import seeding
+from torchlib.common import FloatTensor
 from torchlib.deep_rl.envs.model_based import ModelBasedEnv
 
 from gym_energyplus.envs.energyplus_build_model import build_ep_model
@@ -273,11 +275,22 @@ class EnergyPlusEnv(ModelBasedEnv):
 
         west_upper_violations = west_temperature > (self.temperature_center + self.temperature_tolerance)
         west_lower_violations = west_temperature < (self.temperature_center - self.temperature_tolerance)
-        west_violations = np.logical_or(west_lower_violations, west_upper_violations).astype(np.float32)
+        if isinstance(states, np.ndarray):
+            west_violations = np.logical_or(west_lower_violations, west_upper_violations).astype(np.float32)
+        elif isinstance(states, torch.Tensor):
+            west_violations = (west_lower_violations | west_upper_violations).type(FloatTensor)
+        else:
+            raise TypeError('Unknown type {}'.format(type(states)))
 
         east_upper_violations = east_temperature > (self.temperature_center + self.temperature_tolerance)
         east_lower_violations = east_temperature < (self.temperature_center - self.temperature_tolerance)
-        east_violations = np.logical_or(east_upper_violations, east_lower_violations).astype(np.float32)
+
+        if isinstance(states, np.ndarray):
+            east_violations = np.logical_or(east_upper_violations, east_lower_violations).astype(np.float32)
+        elif isinstance(states, torch.Tensor):
+            east_violations = (east_upper_violations | east_lower_violations).type(FloatTensor)
+        else:
+            raise TypeError('Unknown type {}'.format(type(states)))
 
         violations = west_violations + east_violations
 

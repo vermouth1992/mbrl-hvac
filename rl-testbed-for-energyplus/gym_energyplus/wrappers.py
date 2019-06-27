@@ -106,6 +106,7 @@ class Monitor(CostFnWrapper):
 
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
+        self.writer.add_scalar('observation/outside_temperature', obs[0], self.global_step)
         self.writer.add_scalar('observation/west_temperature', obs[1], self.global_step)
         self.writer.add_scalar('observation/east_temperature', obs[2], self.global_step)
         self.writer.add_scalar('observation/ite_power (MW)', obs[4] / 1e6, self.global_step)
@@ -117,3 +118,6 @@ class Monitor(CostFnWrapper):
         self.writer.add_scalar('action/east_airflow', original_action[3], self.global_step)
         self.global_step += 1
         return obs, reward, done, info
+
+    def reset(self, **kwargs):
+        return self.env.reset(**kwargs)

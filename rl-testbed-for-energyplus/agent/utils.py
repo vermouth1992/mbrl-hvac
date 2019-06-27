@@ -118,18 +118,18 @@ class EpisodicHistoryDataset(object):
     def random_iterator(self, batch_size):
         states = []
         actions = []
-        next_states = []
+        delta_states = []
         for trajectory in self.memory:
             for i in range(self.window_length, trajectory.state.shape[0]):
                 states.append(trajectory.state[i - self.window_length:i])
-                next_states.append(trajectory.state[i])
+                delta_states.append(trajectory.state[i] - trajectory.state[i - 1])
                 actions.append(trajectory.action[i - self.window_length:i])
 
-        states = np.concatenate(states, axis=0)
-        actions = np.concatenate(actions, axis=0)
-        next_states = np.concatenate(next_states, axis=0)
+        states = np.stack(states, axis=0)
+        actions = np.stack(actions, axis=0)
+        delta_states = np.stack(delta_states, axis=0)
 
-        data_loader = create_data_loader((states, actions, next_states), batch_size=batch_size, shuffle=True,
+        data_loader = create_data_loader((states, actions, delta_states), batch_size=batch_size, shuffle=True,
                                          drop_last=False)
 
         return data_loader

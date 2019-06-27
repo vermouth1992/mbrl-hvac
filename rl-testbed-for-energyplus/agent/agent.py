@@ -14,7 +14,7 @@ class VanillaAgent(BaseAgent):
     def __init__(self, model: Model, planner, window_length: int, action_space: Space):
         self.model = model
         self.planner = planner
-        self.history_states = deque(maxlen=window_length)
+        self.history_states = deque(maxlen=window_length - 1)
         self.history_actions = deque(maxlen=window_length - 1)
         self.action_space = action_space
 
@@ -40,11 +40,11 @@ class VanillaAgent(BaseAgent):
         self.model.set_statistics(initial_dataset)
 
     def predict(self, state):
-        self.history_states.append(state)
         if len(self.history_states) < self.history_states.maxlen:
             action = self.action_space.sample()
         else:
-            action = self.planner.predict(np.array(self.history_states), np.array(self.history_actions))
+            action = self.planner.predict(np.array(self.history_states), np.array(self.history_actions), state)
+        self.history_states.append(state)
         self.history_actions.append(action)
         return action
 

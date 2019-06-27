@@ -2,7 +2,6 @@
 # Project name: Reinforcement Learning Testbed for Power Consumption Optimization
 # This project is licensed under the MIT License, see LICENSE
 
-import gzip
 import os
 import shutil
 import subprocess
@@ -10,14 +9,14 @@ from argparse import ArgumentParser
 from glob import glob
 
 import numpy as np
-from gym import Env
 from gym.utils import seeding
+from torchlib.deep_rl.envs.model_based import ModelBasedEnv
 
 from gym_energyplus.envs.energyplus_build_model import build_ep_model
 from gym_energyplus.envs.pipe_io import PipeIo
 
 
-class EnergyPlusEnv(Env):
+class EnergyPlusEnv(ModelBasedEnv):
     metadata = {'render.modes': ['human']}
 
     def __init__(self,
@@ -64,6 +63,10 @@ class EnergyPlusEnv(Env):
 
         self.action_space = self.ep_model.action_space
         self.observation_space = self.ep_model.observation_space
+
+        self.temperature_center = self.ep_model.temperature_center
+        self.temperature_tolerance = self.ep_model.temperature_tolerance
+
         # TODO: self.reward_space which defaults to [-inf,+inf]
         self.pipe_io = PipeIo()
 
@@ -172,9 +175,9 @@ class EnergyPlusEnv(Env):
             # Compress csv file and remove unnecessary files
             # If csv file is not present in some reason, preserve all other files for inspection
             if os.path.isfile(file_csv):
-                with open(file_csv, 'rb') as f_in:
-                    with gzip.open(file_csv_gz, 'wb') as f_out:
-                        shutil.copyfileobj(f_in, f_out)
+                # with open(file_csv, 'rb') as f_in:
+                #     with gzip.open(file_csv_gz, 'wb') as f_out:
+                #         shutil.copyfileobj(f_in, f_out)
                 os.remove(file_csv)
 
                 if not os.path.exists("/tmp/verbose"):
@@ -252,6 +255,33 @@ class EnergyPlusEnv(Env):
 
     def dump_episodes(self, log_dir='', csv_file='', reward_file=''):
         self.ep_model.dump_episodes(log_dir=log_dir, csv_file=csv_file)
+
+    def cost_fn(self, states, actions, next_states):
+        """ We want to minimize the total power consumption
+
+        Args:
+            states: current state (outside_temp, west_temp, east_temp, total_power, ite_power, hvac_power)
+            actions: action (west_setpoint, east_setpoint, west_airflow, east_airflow)
+            next_states: next state (outside_temp, west_temp, east_temp, total_power, ite_power, hvac_power)
+
+        Returns: Combine total power consumption and constraints into a single metric
+
+        """
+        west_temperature = next_states[:, 1]
+        east_temperature = next_states[:, 2]
+        total_power_consumption = next_states[:, 3]
+
+        west_upper_violations = west_temperature > (self.temperature_center + self.temperature_tolerance)
+        west_lower_violations = west_temperature < (self.temperature_center - self.temperature_tolerance)
+        west_violations = np.logical_or(west_lower_violations, west_upper_violations).astype(np.float32)
+
+        east_upper_violations = east_temperature > (self.temperature_center + self.temperature_tolerance)
+        east_lower_violations = east_temperature < (self.temperature_center - self.temperature_tolerance)
+        east_violations = np.logical_or(east_upper_violations, east_lower_violations).astype(np.float32)
+
+        violations = west_violations + east_violations
+
+        return total_power_consumption / 1e6 + violations
 
 
 def parser():

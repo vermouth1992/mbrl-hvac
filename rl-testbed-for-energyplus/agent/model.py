@@ -119,14 +119,20 @@ class EnergyPlusDynamicsModel(Model):
 
         """
         assert self.state_mean is not None, 'Please set statistics before training for inference.'
-        states_normalized = normalize(states, self.state_mean, self.state_std)
+        state_mean = torch.unsqueeze(torch.unsqueeze(self.state_mean, dim=0), dim=0)
+        state_std = torch.unsqueeze(torch.unsqueeze(self.state_std, dim=0), dim=0)
+
+        states_normalized = normalize(states, state_mean, state_std)
 
         if not self.dynamics_model.discrete:
-            actions = normalize(actions, self.action_mean, self.action_std)
+            action_mean = torch.unsqueeze(torch.unsqueeze(self.action_mean, dim=0), dim=0)
+            action_std = torch.unsqueeze(torch.unsqueeze(self.action_std, dim=0), dim=0)
+            actions = normalize(actions, action_mean, action_std)
 
         predicted_delta_state_normalized = self.dynamics_model.forward(states_normalized, actions)
-        predicted_delta_state = unnormalize(predicted_delta_state_normalized, self.delta_state_mean,
-                                            self.delta_state_std)
+        delta_state_mean = torch.unsqueeze(self.delta_state_mean, dim=0)
+        delta_state_std = torch.unsqueeze(self.delta_state_std, dim=0)
+        predicted_delta_state = unnormalize(predicted_delta_state_normalized, delta_state_mean, delta_state_std)
         return states[:, -1, :] + predicted_delta_state
 
     def state_dict(self):

@@ -1,3 +1,4 @@
+runs/
 *.ipynb
 .idea/
 log/

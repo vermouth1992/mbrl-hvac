@@ -7,10 +7,16 @@ current step and previous step. We use the same action within the same control s
 import gym.spaces
 import numpy as np
 from gym.core import Wrapper
+from torch.utils.tensorboard import SummaryWriter
 from torchlib.deep_rl.envs.model_based import ModelBasedEnv
 
 
-class RepeatAction(Wrapper):
+class CostFnWrapper(Wrapper):
+    def cost_fn(self, states, actions, next_states):
+        return self.env.cost_fn(states, actions, next_states)
+
+
+class RepeatAction(CostFnWrapper, ModelBasedEnv):
     def __init__(self, env):
         super(RepeatAction, self).__init__(env=env)
         self.last_obs = None
@@ -44,7 +50,7 @@ class RepeatAction(Wrapper):
         return obs
 
 
-class EnergyPlusWrapper(Wrapper, ModelBasedEnv):
+class EnergyPlusWrapper(CostFnWrapper):
     """
     Break a super long episode env into small length episodes. Used for PPO
     1. If the user calls reset, it will remain at the originally step.
@@ -62,6 +68,8 @@ class EnergyPlusWrapper(Wrapper, ModelBasedEnv):
         self.action_space = gym.spaces.Box(low=-1., high=1., shape=self.env.action_space.low.shape)
 
     def step(self, action):
+        assert self.action_space.contains(action), 'Action {} is out of bound of [-1, 1]'.format(action)
+
         obs, reward, done, info = self.env.step(action)
         self.last_obs = obs
         if done:
@@ -74,26 +82,13 @@ class EnergyPlusWrapper(Wrapper, ModelBasedEnv):
 
         if self.current_steps == self.max_steps:
             return self.get_obs(), reward, True, info
-
-        return self.get_obs(), reward, done, info
+        elif self.current_steps < self.max_steps:
+            return self.get_obs(), reward, done, info
+        else:
+            raise ValueError('Please call reset before step.')
 
     def get_obs(self):
         return self.last_obs
-
-    def cost_fn(self, states, actions, next_states):
-        """ We want to minimize the total power consumption
-
-        Args:
-            states: current state (outside_temp, west_temp, east_temp, total_power, ite_power, hvac_power)
-            actions: action (west_setpoint, east_setpoint, west_airflow, east_airflow)
-            next_states: next state (outside_temp, west_temp, east_temp, total_power, ite_power, hvac_power)
-
-        Returns: Combine total power consumption and constraints into a single metric
-
-        """
-        west_temperature = states[:, 1]
-        east_temperature = states[:, 2]
-        total_power_consumption = states[:, 3]
 
     def reset(self, **kwargs):
         if self.true_done:
@@ -101,3 +96,24 @@ class EnergyPlusWrapper(Wrapper, ModelBasedEnv):
             self.true_done = False
         self.current_steps = 0
         return self.get_obs()
+
+
+class Monitor(CostFnWrapper):
+    def __init__(self, env, log_dir=None):
+        super(Monitor, self).__init__(env=env)
+        self.writer = SummaryWriter(log_dir=log_dir)
+        self.global_step = 0
+
+    def step(self, action):
+        obs, reward, done, info = self.env.step(action)
+        self.writer.add_scalar('observation/west_temperature', obs[1], self.global_step)
+        self.writer.add_scalar('observation/east_temperature', obs[2], self.global_step)
+        self.writer.add_scalar('observation/ite_power (MW)', obs[4] / 1e6, self.global_step)
+        self.writer.add_scalar('observation/hvac_power (MW)', obs[5] / 1e6, self.global_step)
+        original_action = self.action_space.low + (action + 1.) * 0.5 * (self.action_space.high - self.action_space.low)
+        self.writer.add_scalar('action/west_setpoint', original_action[0], self.global_step)
+        self.writer.add_scalar('action/east_setpoint', original_action[1], self.global_step)
+        self.writer.add_scalar('action/west_airflow', original_action[2], self.global_step)
+        self.writer.add_scalar('action/east_airflow', original_action[3], self.global_step)
+        self.global_step += 1
+        return obs, reward, done, info

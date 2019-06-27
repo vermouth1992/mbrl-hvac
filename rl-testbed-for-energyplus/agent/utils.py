@@ -113,7 +113,7 @@ class EpisodicHistoryDataset(object):
 
         while self.size > self.maxlen:
             trajectory = self.memory.popleft()
-            self.size -= len(trajectory.state)
+            self.size -= len(trajectory.action)
 
     def random_iterator(self, batch_size):
         states = []

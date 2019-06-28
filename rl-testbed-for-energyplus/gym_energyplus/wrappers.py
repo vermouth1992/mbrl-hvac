@@ -4,11 +4,14 @@ Wrappers for energyplus env.
 current step and previous step. We use the same action within the same control step (15 min).
 """
 
+import shutil
+import os
 import gym.spaces
 import numpy as np
-from gym.core import Wrapper
+from gym.core import Wrapper, ObservationWrapper, ActionWrapper
 from torch.utils.tensorboard import SummaryWriter
 from torchlib.deep_rl.envs.model_based import ModelBasedEnv
+import gym.spaces as spaces
 
 
 class CostFnWrapper(Wrapper):
@@ -101,23 +104,81 @@ class EnergyPlusWrapper(CostFnWrapper):
 class Monitor(CostFnWrapper):
     def __init__(self, env, log_dir=None):
         super(Monitor, self).__init__(env=env)
+        if os.path.isdir(log_dir):
+            shutil.rmtree(log_dir)
+        self.log_dir = log_dir
         self.writer = SummaryWriter(log_dir=log_dir)
         self.global_step = 0
+        self.episode_index = 0
 
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
+        original_action = self.action_space.low + (action + 1.) * 0.5 * (self.action_space.high -
+                                                                         self.action_space.low)
+        self.dump_csv(obs, original_action, reward)
+        self.dump_tensorboard(obs, original_action, reward)
+        self.global_step += 1
+        if done:
+            self.logger.close()
+        return obs, reward, done, info
+
+    def reset(self, **kwargs):
+        self.logger = open(os.path.join(self.log_dir, 'episode-{}.csv'.format(self.episode_index)), 'w')
+        self.episode_index += 1
+        self.dump_csv_header()
+        return self.env.reset(**kwargs)
+
+    def dump_csv_header(self):
+        self.logger.write('outside_temperature,west_temperature,east_temperature,ite_power,hvac_power,' +
+                          'west_setpoint,east_setpoint,west_airflow,east_airflow,reward\n')
+
+    def dump_csv(self, obs, original_action, reward):
+        self.logger.write('{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.4f}\n'.format(
+            obs[0], obs[1], obs[2], obs[4], obs[5], original_action[0], original_action[1],
+            original_action[2], original_action[3], reward))
+
+    def dump_tensorboard(self, obs, original_action, reward):
         self.writer.add_scalar('observation/outside_temperature', obs[0], self.global_step)
         self.writer.add_scalar('observation/west_temperature', obs[1], self.global_step)
         self.writer.add_scalar('observation/east_temperature', obs[2], self.global_step)
         self.writer.add_scalar('observation/ite_power (MW)', obs[4] / 1e6, self.global_step)
         self.writer.add_scalar('observation/hvac_power (MW)', obs[5] / 1e6, self.global_step)
-        original_action = self.action_space.low + (action + 1.) * 0.5 * (self.action_space.high - self.action_space.low)
         self.writer.add_scalar('action/west_setpoint', original_action[0], self.global_step)
         self.writer.add_scalar('action/east_setpoint', original_action[1], self.global_step)
         self.writer.add_scalar('action/west_airflow', original_action[2], self.global_step)
         self.writer.add_scalar('action/east_airflow', original_action[3], self.global_step)
-        self.global_step += 1
-        return obs, reward, done, info
+        self.writer.add_scalar('data/reward', reward, self.global_step)
 
-    def reset(self, **kwargs):
-        return self.env.reset(**kwargs)
+
+class EnergyPlusObsWrapper(ObservationWrapper):
+    def __init__(self, env):
+        super(EnergyPlusObsWrapper, self).__init__(env=env)
+        self.obs_max = np.array([50., 50., 50., 1e5, 1e5], dtype=np.float32)
+
+        self.observation_space = spaces.Box(low=np.array([-20.0, -20.0, -20.0, 0.0, 0.0]),
+                                            high=np.array([50.0, 50.0, 50.0, 1000000000.0, 1000000000.0]),
+                                            dtype=np.float32)
+
+    def reverse_observation(self, normalized_obs):
+        obs = normalized_obs * self.obs_max
+        total_power = obs[3] + obs[4]
+        obs = np.insert(obs, 3, total_power)
+        return obs
+
+    def observation(self, observation):
+        temperature_obs = observation[0:3]
+        power_obs = observation[4:]
+        obs = np.concatenate((temperature_obs, power_obs))
+        return obs / self.obs_max
+
+
+class EnergyPlusDiscreteActionWrapper(ActionWrapper):
+    def __init__(self, env, num_levels=4):
+        super(EnergyPlusDiscreteActionWrapper, self).__init__(env=env)
+        self.action_space = spaces.Discrete(num_levels ** env.action_space.shape[0])
+
+    def action(self, action):
+        pass
+
+    def reverse_action(self, action):
+        pass

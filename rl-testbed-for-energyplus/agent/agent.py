@@ -11,22 +11,22 @@ from .utils import EpisodicHistoryDataset as Dataset
 
 
 class VanillaAgent(BaseAgent):
-    def __init__(self, model: Model, planner, window_length: int, action_space: Space):
+    def __init__(self, model: Model, planner, window_length: int, baseline_agent):
         self.model = model
         self.planner = planner
         self.history_states = deque(maxlen=window_length - 1)
         self.history_actions = deque(maxlen=window_length - 1)
-        self.action_space = action_space
+        self.baseline_agent = baseline_agent
 
     def reset(self):
         """ Only reset on True done of one episode. """
         self.history_states.clear()
 
     def train(self):
-        pass
+        self.model.train()
 
     def test(self):
-        pass
+        self.model.test()
 
     def save_checkpoint(self, checkpoint_path):
         print('Saving checkpoint to {}'.format(checkpoint_path))
@@ -40,8 +40,9 @@ class VanillaAgent(BaseAgent):
         self.model.set_statistics(initial_dataset)
 
     def predict(self, state):
+        self.test()
         if len(self.history_states) < self.history_states.maxlen:
-            action = self.action_space.sample()
+            action = self.baseline_agent.predict(state)
         else:
             action = self.planner.predict(np.array(self.history_states), np.array(self.history_actions), state)
         self.history_states.append(state)
@@ -49,4 +50,5 @@ class VanillaAgent(BaseAgent):
         return action
 
     def fit_dynamic_model(self, dataset: Dataset, epoch=60, batch_size=128, verbose=False):
+        self.train()
         self.model.fit_dynamic_model(dataset, epoch, batch_size, verbose)

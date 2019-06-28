@@ -50,13 +50,14 @@ class PIDAgent(BaseAgent):
         act_west = max(self.lo, min(act_west, self.hi))
         act_east = max(self.lo, min(act_east, self.hi))
         action = np.array([act_west, act_east, self.default_flow, self.default_flow])
-        return self.normalize_action(action)
+        return self.normalize_action(action).astype(np.float32)
 
 
 def train(city='sf',
           temperature_center=22.5,
           temp_tolerance=0.5,
           window_length=20,
+          num_dataset_maxlen_days=56,
           num_days_per_episodes=5,
           num_init_random_rollouts=2,  # 10 days as initial period
           num_on_policy_rollouts=2,  # 10 days as grace period, indicated as data distribution shift
@@ -67,9 +68,9 @@ def train(city='sf',
           training_batch_size=128,
           verbose=True,
           checkpoint_path=None):
-    dataset_maxlen = 96 * num_days_per_episodes * 56  # the dataset contains 8 weeks of historical data
+    dataset_maxlen = 96 * num_days_per_episodes * num_dataset_maxlen_days  # the dataset contains 8 weeks of historical data
     max_rollout_length = 96 * num_days_per_episodes  # each episode is n days
-    num_on_policy_iters = 365 // num_days_per_episodes * num_years  # run for 3 years
+    num_on_policy_iters = 365 // num_days_per_episodes // num_on_policy_rollouts * num_years
 
     env = EnergyPlusEnv(energyplus_file=energyplus_bin_path,
                         model_file=get_model_filepath('temp_fan'),
@@ -90,11 +91,11 @@ def train(city='sf',
     env = EnergyPlusWrapper(env, max_steps=max_rollout_length)
 
     # collect dataset using random policy
-    random_policy = PIDAgent(target=temperature_center - 3.5)
+    baseline_agent = PIDAgent(target=temperature_center - 3.5)
     dataset = EpisodicHistoryDataset(maxlen=dataset_maxlen, window_length=window_length)
 
     print('Gathering initial dataset...')
-    initial_dataset = gather_rollouts(env, random_policy, num_init_random_rollouts, np.inf)
+    initial_dataset = gather_rollouts(env, baseline_agent, num_init_random_rollouts, np.inf)
     dataset.append(initial_dataset)
 
     model = EnergyPlusDynamicsModel()
@@ -105,17 +106,14 @@ def train(city='sf',
     planner = BestRandomActionPlanner(model, action_sampler, env.cost_fn, horizon=mpc_horizon,
                                       num_random_action_selection=num_random_action_selection)
 
-    agent = VanillaAgent(model, planner, window_length, env.action_space)
-
-    agent.set_statistics(dataset)
-
-    agent.train()
+    agent = VanillaAgent(model, planner, window_length, baseline_agent)
 
     # gather new rollouts using MPC and retrain dynamics model
     for num_iter in range(num_on_policy_iters):
         if verbose:
             print('On policy iteration {}/{}. Size of dataset: {}. Number of trajectories: {}'.format(
                 num_iter + 1, num_on_policy_iters, len(dataset), dataset.num_trajectories))
+        agent.set_statistics(dataset)
         agent.fit_dynamic_model(dataset=dataset, epoch=training_epochs, batch_size=training_batch_size,
                                 verbose=verbose)
         on_policy_dataset = gather_rollouts(env, agent, num_on_policy_rollouts, max_rollout_length)
@@ -151,14 +149,15 @@ if __name__ == '__main__':
     train(city='sf',
           temperature_center=22.5,
           temp_tolerance=1.0,
-          window_length=15,
+          window_length=10,
+          num_dataset_maxlen_days=120,
           num_days_per_episodes=1,
-          num_init_random_rollouts=56,  # 56 days as initial period
-          num_on_policy_rollouts=2,  # 2 days as grace period, indicated as data distribution shift
+          num_init_random_rollouts=60,  # 56 days as initial period
+          num_on_policy_rollouts=5,  # 5 days as grace period, indicated as data distribution shift
           num_years=3,
-          mpc_horizon=15,
+          mpc_horizon=5,
           num_random_action_selection=8192,
-          training_epochs=60,
+          training_epochs=100,
           training_batch_size=128,
           verbose=True,
           checkpoint_path=None)

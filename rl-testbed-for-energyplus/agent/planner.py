@@ -20,7 +20,7 @@ class Planner(object):
 
 class BestRandomActionPlanner(Planner):
     def __init__(self, model, action_sampler: BaseSampler, cost_fn=None,
-                 horizon=15, num_random_action_selection=4096):
+                 horizon=15, num_random_action_selection=4096, gamma=0.95):
         """
         Args:
             model: Model instance. Can predict next states and optional cost (reward)
@@ -33,6 +33,7 @@ class BestRandomActionPlanner(Planner):
         self.action_sampler = action_sampler
         self.horizon = horizon
         self.num_random_action_selection = num_random_action_selection
+        self.gamma = gamma
         if cost_fn is None:
             self.cost_fn = model.cost_fn
         else:

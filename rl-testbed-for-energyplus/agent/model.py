@@ -21,7 +21,7 @@ class LSTMAttention(nn.Module):
         self.lstm = nn.LSTM(input_size=feature_dim, hidden_size=hidden_size, num_layers=1, batch_first=True,
                             bidirectional=False)
         self.attention_matrix = nn.Parameter(torch.randn(hidden_size, 1), requires_grad=True)
-        self.dropout = nn.Dropout(0.5)
+        # self.dropout = nn.Dropout(0.5)
         self.out_linear = nn.Linear(hidden_size, state_dim)
 
     def forward(self, state, action):
@@ -52,7 +52,7 @@ class LSTMAttention(nn.Module):
 
         h = torch.tanh(r)
 
-        h = self.dropout.forward(h)
+        # h = self.dropout.forward(h)
 
         score = self.out_linear.forward(h)
 
@@ -73,6 +73,12 @@ class EnergyPlusDynamicsModel(Model):
 
         if enable_cuda:
             self.dynamics_model.cuda()
+
+    def train(self):
+        self.dynamics_model.train()
+
+    def test(self):
+        self.dynamics_model.eval()
 
     def set_statistics(self, initial_dataset: Dataset):
         self.state_mean = convert_numpy_to_tensor(initial_dataset.state_mean)

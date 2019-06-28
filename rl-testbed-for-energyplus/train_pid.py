@@ -61,8 +61,8 @@ def make_parser():
     from argparse import ArgumentParser
     parser = ArgumentParser()
     parser.add_argument('--city', type=str, choices=outside_temp_difference.keys())
-    parser.add_argument('--temp_center', type=float, default=22.5)
-    parser.add_argument('--temp_tolerance', type=float, default=1.0)
+    parser.add_argument('--temp_center', type=float, default=23.5)
+    parser.add_argument('--temp_tolerance', type=float, default=1.5)
     return parser
 
 

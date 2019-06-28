@@ -176,9 +176,36 @@ class EnergyPlusDiscreteActionWrapper(ActionWrapper):
     def __init__(self, env, num_levels=4):
         super(EnergyPlusDiscreteActionWrapper, self).__init__(env=env)
         self.action_space = spaces.Discrete(num_levels ** env.action_space.shape[0])
+        self.action_table = np.linspace(-1., 1., num_levels)
+        self.num_levels = num_levels
 
     def action(self, action):
-        pass
+        """
+
+        Args:
+            action: a integer ranging from 0 to max
+
+        Returns: n * [-1, 1]
+
+        """
+        assert self.action_space.contains(action), 'Action {} is not in space {}'.format(
+            action, self.action_space)
+        binary_action = []
+        for _ in range(self.env.action_space.shape[0]):
+            remainder = action % self.num_levels
+            binary_action.append(remainder)
+            action = (action - remainder) // self.num_levels
+        action = self.action_table[binary_action]
+        return action
 
     def reverse_action(self, action):
+        """ Find the closest action in action_table and translate to MultiDiscrete.
+            Then translate to Discrete
+
+        Args:
+            action:
+
+        Returns:
+
+        """
         pass

@@ -146,7 +146,7 @@ def make_parser():
     parser.add_argument('--temp_center', type=float, default=23.5)
     parser.add_argument('--temp_tolerance', type=float, default=1.5)
     parser.add_argument('--window_length', type=int, default=20)
-    parser.add_argument('--num_years', type=int, default=5)
+    parser.add_argument('--num_years', type=int, default=3)
     parser.add_argument('--num_days_on_policy', type=int, default=10)
     parser.add_argument('--mpc_horizon', type=int, default=5)
     parser.add_argument('--gamma', type=float, default=0.95)

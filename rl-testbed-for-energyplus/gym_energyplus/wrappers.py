@@ -4,6 +4,7 @@ Wrappers for energyplus env.
 current step and previous step. We use the same action within the same control step (15 min).
 """
 
+import torch
 import shutil
 import os
 import gym.spaces
@@ -11,6 +12,7 @@ import numpy as np
 from gym.core import Wrapper, ObservationWrapper, ActionWrapper
 from torch.utils.tensorboard import SummaryWriter
 from torchlib.deep_rl.envs.model_based import ModelBasedEnv
+from torchlib.common import convert_numpy_to_tensor
 import gym.spaces as spaces
 
 
@@ -150,10 +152,11 @@ class Monitor(CostFnWrapper):
         self.writer.add_scalar('data/reward', reward, self.global_step)
 
 
-class EnergyPlusObsWrapper(ObservationWrapper):
+class EnergyPlusObsWrapper(ObservationWrapper, CostFnWrapper):
     def __init__(self, env):
         super(EnergyPlusObsWrapper, self).__init__(env=env)
         self.obs_max = np.array([50., 50., 50., 1e5, 1e5], dtype=np.float32)
+        self.obs_max_tensor = convert_numpy_to_tensor(self.obs_max).unsqueeze(dim=0)
 
         self.observation_space = spaces.Box(low=np.array([-20.0, -20.0, -20.0, 0.0, 0.0]),
                                             high=np.array([50.0, 50.0, 50.0, 1000000000.0, 1000000000.0]),
@@ -170,6 +173,18 @@ class EnergyPlusObsWrapper(ObservationWrapper):
         power_obs = observation[4:]
         obs = np.concatenate((temperature_obs, power_obs))
         return obs / self.obs_max
+
+    def reverse_observation_batch_tensor(self, normalized_obs):
+        assert isinstance(normalized_obs, torch.Tensor)
+        obs = normalized_obs * self.obs_max_tensor
+        total_power = obs[:, 3:4] + obs[:, 4:5]
+        obs = torch.cat((obs[:, :3], total_power, obs[:, 3:]), dim=-1)
+        return obs
+
+    def cost_fn(self, states, actions, next_states):
+        states = self.reverse_observation_batch_tensor(states)
+        next_states = self.reverse_observation_batch_tensor(next_states)
+        return self.env.cost_fn(states, actions, next_states)
 
 
 class EnergyPlusDiscreteActionWrapper(ActionWrapper):

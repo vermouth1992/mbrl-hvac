@@ -33,7 +33,7 @@ class BestRandomActionPlanner(Planner):
         self.action_sampler = action_sampler
         self.horizon = horizon
         self.num_random_action_selection = num_random_action_selection
-        self.gamma = gamma
+        self.gamma_inverse = 1. / gamma
         if cost_fn is None:
             self.cost_fn = model.cost_fn
         else:
@@ -71,7 +71,7 @@ class BestRandomActionPlanner(Planner):
                 states = torch.cat((states, torch.unsqueeze(next_states, dim=1)), dim=1)  # # (N, T, 6)
                 current_action = torch.cat((current_action, torch.unsqueeze(actions[i], dim=1)), dim=1)  # (N, T, 4)
                 next_states = self.model.predict_next_states(states, current_action)  # (N, 6)
-                cost += self.cost_fn(states[:, -1, :], actions[i], next_states)
+                cost += self.cost_fn(states[:, -1, :], actions[i], next_states) * self.gamma_inverse
                 current_action = current_action[:, 1:, :]  # (N, T - 1, 4)
                 states = states[:, 1:, :]
 

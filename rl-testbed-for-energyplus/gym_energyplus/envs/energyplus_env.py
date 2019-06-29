@@ -270,41 +270,36 @@ class EnergyPlusEnv(ModelBasedEnv):
         Returns: Combine total power consumption and constraints into a single metric
 
         """
+        violation_weight = 0.1
+        gaussian_weight = 1.
+        total_power_weight = 1e-5
+        gaussian_sharpness = 0.5
+
+        assert isinstance(states, torch.Tensor)
+
         west_temperature = next_states[:, 1]
         east_temperature = next_states[:, 2]
         total_power_consumption = next_states[:, 3]
 
-        if isinstance(states, np.ndarray):
-            west_upper_violations = np.maximum(
-                west_temperature - (self.temperature_center + self.temperature_tolerance), 0)
-            west_lower_violations = np.maximum(self.temperature_center - self.temperature_tolerance - west_temperature,
-                                               0)
-            west_violations = (west_upper_violations + west_lower_violations).astype(np.float32)
-        elif isinstance(states, torch.Tensor):
-            west_upper_violations = F.relu(west_temperature - (self.temperature_center + self.temperature_tolerance))
-            west_lower_violations = F.relu(self.temperature_center - self.temperature_tolerance - west_temperature)
-            west_violations = (west_upper_violations + west_lower_violations).type(FloatTensor)
-        else:
-            raise TypeError('Unknown type {}'.format(type(states)))
+        west_upper_violations = F.relu(west_temperature - (self.temperature_center + self.temperature_tolerance))
+        west_lower_violations = F.relu(self.temperature_center - self.temperature_tolerance - west_temperature)
+        west_violations = (west_upper_violations + west_lower_violations).type(FloatTensor)
 
-        if isinstance(states, np.ndarray):
-            east_upper_violations = np.maximum(
-                east_temperature - (self.temperature_center + self.temperature_tolerance), 0)
-            east_lower_violations = np.maximum(self.temperature_center - self.temperature_tolerance - east_temperature,
-                                               0)
-            east_violations = (east_upper_violations + east_lower_violations).astype(np.float32)
-        elif isinstance(states, torch.Tensor):
-            east_upper_violations = F.relu(east_temperature - (self.temperature_center + self.temperature_tolerance))
-            east_lower_violations = F.relu(self.temperature_center - self.temperature_tolerance - east_temperature)
-            east_violations = (east_upper_violations + east_lower_violations).type(FloatTensor)
-        else:
-            raise TypeError('Unknown type {}'.format(type(states)))
+        east_upper_violations = F.relu(east_temperature - (self.temperature_center + self.temperature_tolerance))
+        east_lower_violations = F.relu(self.temperature_center - self.temperature_tolerance - east_temperature)
+        east_violations = (east_upper_violations + east_lower_violations).type(FloatTensor)
 
         violations = west_violations + east_violations
 
-        # return total_power_consumption / 1e6 + violations
+        rew_temp_gaussian_west = torch.exp(-(west_temperature - self.temperature_center) ** 2 * gaussian_sharpness)
+        rew_temp_gaussian_east = torch.exp(-(east_temperature - self.temperature_center) ** 2 * gaussian_sharpness)
 
-        return violations
+        rew_temp_gaussian = rew_temp_gaussian_east + rew_temp_gaussian_west
+
+        cost = violations * violation_weight - rew_temp_gaussian * gaussian_weight + \
+               total_power_weight * total_power_consumption
+
+        return cost
 
 
 def parser():

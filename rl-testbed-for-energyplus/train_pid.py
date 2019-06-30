@@ -93,7 +93,7 @@ if __name__ == '__main__':
     true_done = False
     day_index = 1
 
-    agent = PIDAgent(target=temperature_center - outside_temp_difference[city], sensitivity=1.0, alpha=0.5)
+    agent = PIDAgent(target=temperature_center - outside_temp_difference[city], sensitivity=1.5, alpha=0.5)
 
     while not true_done:
         obs = env.reset()

@@ -19,10 +19,11 @@ WEATHER_DIR = os.path.join(ENERGYPLUS_DIR, 'WeatherData')
 energyplus_bin_path = os.path.join(ENERGYPLUS_DIR, 'energyplus')
 
 ENERGYPLUS_WEATHER_dict = {
-    'sf': 'USA_CA_San.Francisco.Intl.AP.724940_TMY3.epw',
-    'golden': 'USA_CO_Golden-NREL.724666_TMY3.epw',
-    'chicago': 'USA_IL_Chicago-OHare.Intl.AP.725300_TMY3.epw',
-    'sterling': 'USA_VA_Sterling-Washington.Dulles.Intl.AP.724030_TMY3.epw',
+    'SF': 'USA_CA_San.Francisco.Intl.AP.724940_TMY3.epw',
+    'Golden': 'USA_CO_Golden-NREL.724666_TMY3.epw',
+    'Chicago': 'USA_IL_Chicago-OHare.Intl.AP.725300_TMY3.epw',
+    'Sterling': 'USA_VA_Sterling-Washington.Dulles.Intl.AP.724030_TMY3.epw',
+    'Tampa': 'USA_FL_Tampa.Intl.AP.722110_TMY3.epw',
 }
 
 ENERGYPLUS_MODEL_dict = {
@@ -31,9 +32,15 @@ ENERGYPLUS_MODEL_dict = {
 }
 
 
-def get_weather_filepath(location):
-    assert location in ENERGYPLUS_WEATHER_dict.keys(), 'Unknown location {}'.format(location)
-    return os.path.join(WEATHER_DIR, ENERGYPLUS_WEATHER_dict[location])
+def get_weather_filepath(locations):
+    if isinstance(locations, str):
+        locations = [locations]
+
+    output = []
+    for location in locations:
+        assert location in ENERGYPLUS_WEATHER_dict.keys(), 'Unknown location {}'.format(location)
+        output.append(os.path.join(WEATHER_DIR, ENERGYPLUS_WEATHER_dict[location]))
+    return ','.join(output)
 
 
 MODEL_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), '../EnergyPlus/Model')

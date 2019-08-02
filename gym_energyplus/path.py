@@ -24,6 +24,7 @@ ENERGYPLUS_WEATHER_dict = {
     'Chicago': 'USA_IL_Chicago-OHare.Intl.AP.725300_TMY3.epw',
     'Sterling': 'USA_VA_Sterling-Washington.Dulles.Intl.AP.724030_TMY3.epw',
     'Tampa': 'USA_FL_Tampa.Intl.AP.722110_TMY3.epw',
+    'Nanjing': 'CHN_Jiangsu.Nanjing.582380_CSWD.epw',
 }
 
 ENERGYPLUS_MODEL_dict = {

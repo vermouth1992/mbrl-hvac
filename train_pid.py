@@ -5,9 +5,7 @@ Environment test playground
 import numpy as np
 from torchlib.deep_rl import BaseAgent
 
-from gym_energyplus.envs.energyplus_env import EnergyPlusEnv
-from gym_energyplus.path import get_model_filepath, get_weather_filepath, energyplus_bin_path
-from gym_energyplus.wrappers import RepeatAction, EnergyPlusWrapper, Monitor
+from gym_energyplus import make_env, ALL_CITIES
 
 
 class PIDAgent(BaseAgent):
@@ -49,20 +47,14 @@ class PIDAgent(BaseAgent):
         return self.normalize_action(action)
 
 
-outside_temp_difference = {
-    'chicago': 3.5,
-    'sf': 3.5,
-    'sterling': 3.5,
-    'golden': 3.5
-}
-
-
 def make_parser():
     from argparse import ArgumentParser
     parser = ArgumentParser()
-    parser.add_argument('--city', type=str, choices=outside_temp_difference.keys())
-    parser.add_argument('--temp_center', type=float, default=23.5)
-    parser.add_argument('--temp_tolerance', type=float, default=1.5)
+    parser.add_argument('--city', type=str, choices=ALL_CITIES, nargs='+')
+    parser.add_argument('--temp_center', type=float, default=23.0)
+    parser.add_argument('--temp_tolerance', type=float, default=1.0)
+    parser.add_argument('--sensitivity', type=float, default=1.0)
+    parser.add_argument('--alpha', type=float, default=0.5)
     return parser
 
 
@@ -79,26 +71,24 @@ if __name__ == '__main__':
 
     temperature_center = args['temp_center']
     temperature_tolerance = args['temp_tolerance']
+    sensitivity = args['sensitivity']
+    alpha = args['alpha']
 
-    env = EnergyPlusEnv(energyplus_file=energyplus_bin_path,
-                        model_file=get_model_filepath('temp_fan'),
-                        weather_file=get_weather_filepath(city),
-                        config={'temp_center': temperature_center, 'temp_tolerance': temperature_tolerance},
-                        log_dir=None,
-                        verbose=True)
-    env = RepeatAction(env)
-    env = Monitor(env, log_dir='runs/{}_{}_{}_pid'.format(city, temperature_center, temperature_tolerance))
-    env = EnergyPlusWrapper(env, max_steps=96)
+    log_dir = 'runs/{}_{}_{}_{}_{}_pid'.format(city, temperature_center, temperature_tolerance, sensitivity, alpha)
+
+    env = make_env(city, temperature_center, temperature_tolerance, obs_normalize=False,
+                   num_days_per_episode=1, log_dir=log_dir)
 
     true_done = False
     day_index = 1
 
-    agent = PIDAgent(target=temperature_center - outside_temp_difference[city], sensitivity=1.5, alpha=0.5)
+    agent = PIDAgent(target=temperature_center - 3.5, sensitivity=sensitivity, alpha=alpha)
 
     while not true_done:
         obs = env.reset()
         print('Day {}'.format(day_index))
         done = False
+        info = None
         while not done:
             action = agent.predict(obs)
             obs, reward, done, info = env.step(action)

@@ -4,16 +4,17 @@ Wrappers for energyplus env.
 current step and previous step. We use the same action within the same control step (15 min).
 """
 
-import torch
-import shutil
 import os
+import shutil
+
 import gym.spaces
+import gym.spaces as spaces
 import numpy as np
+import torch
 from gym.core import Wrapper, ObservationWrapper, ActionWrapper
 from torch.utils.tensorboard import SummaryWriter
-from torchlib.deep_rl.envs.model_based import ModelBasedEnv
 from torchlib.common import convert_numpy_to_tensor
-import gym.spaces as spaces
+from torchlib.deep_rl.envs.model_based import ModelBasedEnv
 
 
 class CostFnWrapper(Wrapper):
@@ -104,8 +105,9 @@ class EnergyPlusWrapper(CostFnWrapper):
 
 
 class Monitor(CostFnWrapper):
-    def __init__(self, env, log_dir=None):
+    def __init__(self, env, log_dir):
         super(Monitor, self).__init__(env=env)
+        assert log_dir is not None, "log_dir can't be None"
         if os.path.isdir(log_dir):
             shutil.rmtree(log_dir)
         self.log_dir = log_dir

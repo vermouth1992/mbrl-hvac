@@ -86,8 +86,6 @@ def train(city='sf',
                                                                 num_random_action_selection,
                                                                 num_on_policy_rollouts,
                                                                 training_epochs)
-    if os.path.isdir(log_dir):
-        shutil.rmtree(log_dir)
     env = Monitor(env, log_dir=log_dir)
     env = EnergyPlusWrapper(env, max_steps=max_rollout_length)
     env = EnergyPlusObsWrapper(env)

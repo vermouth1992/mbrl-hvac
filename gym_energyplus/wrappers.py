@@ -155,9 +155,11 @@ class Monitor(CostFnWrapper):
 
 
 class EnergyPlusObsWrapper(ObservationWrapper, CostFnWrapper):
-    def __init__(self, env):
+    def __init__(self, env, temperature_center):
         super(EnergyPlusObsWrapper, self).__init__(env=env)
-        self.obs_max = np.array([50., 50., 50., 1e5, 1e5], dtype=np.float32)
+        self.obs_mean = np.array([temperature_center, temperature_center, temperature_center, 0., 0.],
+                                 dtype=np.float32)
+        self.obs_max = np.array([30., 30., 30., 1e5, 1e5], dtype=np.float32)
         self.obs_max_tensor = convert_numpy_to_tensor(self.obs_max).unsqueeze(dim=0)
 
         self.observation_space = spaces.Box(low=np.array([-20.0, -20.0, -20.0, 0.0, 0.0]),

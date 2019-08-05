@@ -19,7 +19,6 @@ class EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan(EnergyPlusModel):
                  log_dir,
                  config=None,
                  verbose=False):
-        super(EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan, self).__init__(model_file, log_dir, verbose)
         self.reward_low_limit = -10000.
         self.axepisode = None
         self.num_axes = 5
@@ -30,53 +29,14 @@ class EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan(EnergyPlusModel):
 
         self.temperature_center = config.get('temp_center', 23.5)
         self.temperature_tolerance = config.get('temp_tolerance', 0.5)
-
-        self.electric_powers = [
-            # 'Whole Building:Facility Total Electric Demand Power [W](Hourly)', # very high
-            # 'Whole Building:Facility Total Building Electric Demand Power [W](Hourly)', # very high
-            # 'Whole Building:Facility Total HVAC Electric Demand Power [W](Hourly)', # low
-
-            # 'WESTDATACENTER_EQUIP:ITE CPU Electric Power [W](Hourly)', # low
-            # 'WESTDATACENTER_EQUIP:ITE Fan Electric Power [W](Hourly)', # low
-            # 'WESTDATACENTER_EQUIP:ITE UPS Electric Power [W](Hourly)', # low
-
-            # 'WESTDATACENTER_EQUIP:ITE CPU Electric Power at Design Inlet Conditions [W](Hourly)', # low (only depends on time in day)
-            # 'WESTDATACENTER_EQUIP:ITE Fan Electric Power at Design Inlet Conditions [W](Hourly)', # low (only depends on time in day)
-            # 'WEST ZONE:Zone ITE CPU Electric Power [W](Hourly)', # low
-            # 'WEST ZONE:Zone ITE Fan Electric Power [W](Hourly)', # low
-            # 'WEST ZONE:Zone ITE UPS Electric Power [W](Hourly)', # low
-            # 'WEST ZONE:Zone ITE CPU Electric Power at Design Inlet Conditions [W](Hourly)', # low (only depends on time in day)
-            # 'WEST ZONE:Zone ITE Fan Electric Power at Design Inlet Conditions [W](Hourly)', # low (only depends on time in day)
-            # 'WEST DATA CENTER IEC:Evaporative Cooler Electric Power [W](TimeStep)', # low (works only on very cold day)
-            # 'WEST DATA CENTER DEC:Evaporative Cooler Electric Power [W](TimeStep)', # low (never works)
-            # 'EMS:Power Utilization Effectiveness [](TimeStep)',
-
-            # 'Whole Building:Facility Total Electric Demand Power [W](Hourly)', # very high
-            # 'Whole Building:Facility Total Building Electric Demand Power [W](Hourly)', # very high
-            # 'Whole Building:Facility Total HVAC Electric Demand Power [W](Hourly)', # low
-
-            # 'EASTDATACENTER_EQUIP:ITE CPU Electric Power [W](Hourly)', # low
-            # 'EASTDATACENTER_EQUIP:ITE Fan Electric Power [W](Hourly)', # low
-            # 'EASTDATACENTER_EQUIP:ITE UPS Electric Power [W](Hourly)', # low
-
-            # 'EASTDATACENTER_EQUIP:ITE CPU Electric Power at Design Inlet Conditions [W](Hourly)', # low (only depends on time in day)
-            # 'EASTDATACENTER_EQUIP:ITE Fan Electric Power at Design Inlet Conditions [W](Hourly)', # low (only depends on time in day)
-            # 'EAST ZONE:Zone ITE CPU Electric Power [W](Hourly)', # low
-            # 'EAST ZONE:Zone ITE Fan Electric Power [W](Hourly)', # low
-            # 'EAST ZONE:Zone ITE UPS Electric Power [W](Hourly)', # low
-            # 'EAST ZONE:Zone ITE CPU Electric Power at Design Inlet Conditions [W](Hourly)', # low (only depends on time in day)
-            # 'EAST ZONE:Zone ITE Fan Electric Power at Design Inlet Conditions [W](Hourly)', # low (only depends on time in day)
-            # 'EAST DATA CENTER IEC:Evaporative Cooler Electric Power [W](TimeStep)', # low (works only on very cold day)
-            # 'EAST DATA CENTER DEC:Evaporative Cooler Electric Power [W](TimeStep)', # low (never works)
-
-            # 'EMS:Power Utilization Effectiveness [](TimeStep)',
-        ]
+        self.safe_action_range = config.get('safe_action', (-10, 5))
+        super(EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan, self).__init__(model_file, log_dir, verbose)
 
     def setup_spaces(self):
         # Bound action temperature
-        lo = 10.0
-        hi = 40.0
-        flow_hi = 7.0
+        lo = self.temperature_center + self.safe_action_range[0]
+        hi = self.temperature_center + self.safe_action_range[1]
+        flow_hi = 10.0
         flow_lo = flow_hi * 0.25
         self.action_space = spaces.Box(low=np.array([lo, lo, flow_lo, flow_lo]),
                                        high=np.array([hi, hi, flow_hi, flow_hi]),

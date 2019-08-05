@@ -97,14 +97,19 @@ class EnergyPlusModel(metaclass=ABCMeta):
                 x_labels.append(dt.strftime('%m/%d'))
         return x_pos, x_labels
 
-    def set_action(self, normalized_action):
+    def set_action(self, action):
         # In TPRO/POP1/POP2 in baseline, action seems to be normalized to [-1.0, 1.0].
         # So it must be scaled back into action_space by the environment.
-        assert normalized_action.shape == self.action_space.low.shape, 'Invalid action {}'.format(normalized_action)
+        assert action.shape == self.action_space.low.shape, 'Invalid action {}'.format(action)
         self.action_prev = self.action
-        self.action = self.action_space.low + (normalized_action + 1.) * 0.5 * (
-                self.action_space.high - self.action_space.low)
+        self.action = action
         self.action = np.clip(self.action, self.action_space.low, self.action_space.high)
+        return action
+
+        # self.action_prev = self.action
+        # self.action = self.action_space.low + (normalized_action + 1.) * 0.5 * (
+        #         self.action_space.high - self.action_space.low)
+        # self.action = np.clip(self.action, self.action_space.low, self.action_space.high)
 
     @abstractmethod
     def setup_spaces(self):

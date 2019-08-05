@@ -17,14 +17,15 @@ from torchlib.deep_rl.envs.model_based import ModelBasedEnv
 
 from gym_energyplus.envs.energyplus_build_model import build_ep_model
 from gym_energyplus.envs.pipe_io import PipeIo
+from ..path import energyplus_bin_path, get_model_filepath
 
 
 class EnergyPlusEnv(ModelBasedEnv):
     metadata = {'render.modes': ['human']}
 
     def __init__(self,
-                 energyplus_file=None,
-                 model_file=None,
+                 energyplus_file=energyplus_bin_path,
+                 model_file=get_model_filepath('temp_fan'),
                  weather_file=None,
                  log_dir=None,
                  config=None,

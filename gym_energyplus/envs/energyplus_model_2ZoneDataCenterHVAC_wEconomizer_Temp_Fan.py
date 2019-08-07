@@ -29,13 +29,12 @@ class EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan(EnergyPlusModel):
 
         self.temperature_center = config.get('temp_center', 23.5)
         self.temperature_tolerance = config.get('temp_tolerance', 0.5)
-        self.safe_action_range = config.get('safe_action', (-10, 5))
         super(EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan, self).__init__(model_file, log_dir, verbose)
 
     def setup_spaces(self):
         # Bound action temperature
-        lo = self.temperature_center + self.safe_action_range[0]
-        hi = self.temperature_center + self.safe_action_range[1]
+        lo = 10.0
+        hi = 40.0
         flow_hi = 10.0
         flow_lo = flow_hi * 0.25
         self.action_space = spaces.Box(low=np.array([lo, lo, flow_lo, flow_lo]),

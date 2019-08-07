@@ -7,7 +7,6 @@ current step and previous step. We use the same action within the same control s
 import os
 import shutil
 
-import gym.spaces
 import gym.spaces as spaces
 import numpy as np
 import torch
@@ -56,6 +55,80 @@ class RepeatAction(CostFnWrapper, ModelBasedEnv):
         return obs
 
 
+class EnergyPlusGradualActionWrapper(ActionWrapper, CostFnWrapper):
+    def __init__(self, env, action_low, action_high, action_delta):
+        super(EnergyPlusGradualActionWrapper, self).__init__(env=env)
+        self.action_space = spaces.Box(low=-1., high=1., shape=self.env.action_space.low.shape)
+        self.action_low = action_low
+        self.action_high = action_high
+        self.action_delta = action_delta
+
+    def reset(self, **kwargs):
+        self.prev_action = (self.action_low + self.action_high) / 2.
+        return self.env.reset(**kwargs)
+
+    def action(self, action):
+        assert self.action_space.contains(action), 'Action {} not in action space'.format(action)
+        self.prev_action = np.clip(self.prev_action + action * self.action_delta,
+                                   a_min=self.action_low, a_max=self.action_high)
+        return self.prev_action
+
+    def cost_fn(self, states, actions, next_states):
+        pass
+
+
+class EnergyPlusNormalizeActionWrapper(ActionWrapper):
+    def __init__(self, env, action_low, action_high):
+        super(EnergyPlusNormalizeActionWrapper, self).__init__(env=env)
+        self.action_space = spaces.Box(low=-1., high=1., shape=self.env.action_space.low.shape)
+        self.action_low = action_low
+        self.action_high = action_high
+
+    def action(self, action):
+        assert self.action_space.contains(action), 'Action {} is invalid'.format(action)
+        action = (action + 1.) / 2. * (self.action_high - self.action_low) + self.action_low
+        return action
+
+
+class EnergyPlusDiscreteActionWrapper(ActionWrapper):
+    def __init__(self, env, num_levels=4):
+        super(EnergyPlusDiscreteActionWrapper, self).__init__(env=env)
+        self.action_space = spaces.Discrete(num_levels ** env.action_space.shape[0])
+        self.action_table = np.linspace(-1., 1., num_levels)
+        self.num_levels = num_levels
+
+    def action(self, action):
+        """
+
+        Args:
+            action: a integer ranging from 0 to max
+
+        Returns: n * [-1, 1]
+
+        """
+        assert self.action_space.contains(action), 'Action {} is not in space {}'.format(
+            action, self.action_space)
+        binary_action = []
+        for _ in range(self.env.action_space.shape[0]):
+            remainder = action % self.num_levels
+            binary_action.append(remainder)
+            action = (action - remainder) // self.num_levels
+        action = self.action_table[binary_action]
+        return action
+
+    def reverse_action(self, action):
+        """ Find the closest action in action_table and translate to MultiDiscrete.
+            Then translate to Discrete
+
+        Args:
+            action:
+
+        Returns:
+
+        """
+        pass
+
+
 class EnergyPlusWrapper(CostFnWrapper):
     """
     Break a super long episode env into small length episodes. Used for PPO
@@ -71,11 +144,7 @@ class EnergyPlusWrapper(CostFnWrapper):
         self.true_done = True
         self.last_obs = None
 
-        self.action_space = gym.spaces.Box(low=-1., high=1., shape=self.env.action_space.low.shape)
-
     def step(self, action):
-        assert self.action_space.contains(action), 'Action {} is out of bound of [-1, 1]'.format(action)
-
         obs, reward, done, info = self.env.step(action)
         self.last_obs = obs
         if done:
@@ -117,10 +186,8 @@ class Monitor(CostFnWrapper):
 
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
-        original_action = self.action_space.low + (action + 1.) * 0.5 * (self.action_space.high -
-                                                                         self.action_space.low)
-        self.dump_csv(obs, original_action, reward)
-        self.dump_tensorboard(obs, original_action, reward)
+        self.dump_csv(obs, action, reward)
+        self.dump_tensorboard(obs, action, reward)
         self.global_step += 1
         if done:
             self.logger.close()
@@ -157,17 +224,18 @@ class Monitor(CostFnWrapper):
 class EnergyPlusObsWrapper(ObservationWrapper, CostFnWrapper):
     def __init__(self, env, temperature_center):
         super(EnergyPlusObsWrapper, self).__init__(env=env)
-        self.obs_mean = np.array([temperature_center, temperature_center, temperature_center, 0., 0.],
+        self.obs_mean = np.array([temperature_center, temperature_center, temperature_center, 1e5, 5000.],
                                  dtype=np.float32)
-        self.obs_max = np.array([30., 30., 30., 1e5, 1e5], dtype=np.float32)
+        self.obs_max = np.array([30., 30., 30., 1e5, 1e4], dtype=np.float32)
+        self.obs_mean_tensor = convert_numpy_to_tensor(self.obs_mean).unsqueeze(dim=0)
         self.obs_max_tensor = convert_numpy_to_tensor(self.obs_max).unsqueeze(dim=0)
 
-        self.observation_space = spaces.Box(low=np.array([-20.0, -20.0, -20.0, 0.0, 0.0]),
-                                            high=np.array([50.0, 50.0, 50.0, 1000000000.0, 1000000000.0]),
+        self.observation_space = spaces.Box(low=np.array([-1., -1., -1., -10., -10.]),
+                                            high=np.array([1., 1., 1., 10.0, 10.0]),
                                             dtype=np.float32)
 
     def reverse_observation(self, normalized_obs):
-        obs = normalized_obs * self.obs_max
+        obs = normalized_obs * self.obs_max + self.obs_mean
         total_power = obs[3] + obs[4]
         obs = np.insert(obs, 3, total_power)
         return obs
@@ -176,11 +244,11 @@ class EnergyPlusObsWrapper(ObservationWrapper, CostFnWrapper):
         temperature_obs = observation[0:3]
         power_obs = observation[4:]
         obs = np.concatenate((temperature_obs, power_obs))
-        return obs / self.obs_max
+        return (obs - self.obs_mean) / self.obs_max
 
     def reverse_observation_batch_tensor(self, normalized_obs):
         assert isinstance(normalized_obs, torch.Tensor)
-        obs = normalized_obs * self.obs_max_tensor
+        obs = normalized_obs * self.obs_max_tensor + self.obs_mean_tensor
         total_power = obs[:, 3:4] + obs[:, 4:5]
         obs = torch.cat((obs[:, :3], total_power, obs[:, 3:]), dim=-1)
         return obs
@@ -189,42 +257,3 @@ class EnergyPlusObsWrapper(ObservationWrapper, CostFnWrapper):
         states = self.reverse_observation_batch_tensor(states)
         next_states = self.reverse_observation_batch_tensor(next_states)
         return self.env.cost_fn(states, actions, next_states)
-
-
-class EnergyPlusDiscreteActionWrapper(ActionWrapper):
-    def __init__(self, env, num_levels=4):
-        super(EnergyPlusDiscreteActionWrapper, self).__init__(env=env)
-        self.action_space = spaces.Discrete(num_levels ** env.action_space.shape[0])
-        self.action_table = np.linspace(-1., 1., num_levels)
-        self.num_levels = num_levels
-
-    def action(self, action):
-        """
-
-        Args:
-            action: a integer ranging from 0 to max
-
-        Returns: n * [-1, 1]
-
-        """
-        assert self.action_space.contains(action), 'Action {} is not in space {}'.format(
-            action, self.action_space)
-        binary_action = []
-        for _ in range(self.env.action_space.shape[0]):
-            remainder = action % self.num_levels
-            binary_action.append(remainder)
-            action = (action - remainder) // self.num_levels
-        action = self.action_table[binary_action]
-        return action
-
-    def reverse_action(self, action):
-        """ Find the closest action in action_table and translate to MultiDiscrete.
-            Then translate to Discrete
-
-        Args:
-            action:
-
-        Returns:
-
-        """
-        pass

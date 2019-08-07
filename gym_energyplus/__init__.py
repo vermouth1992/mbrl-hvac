@@ -9,9 +9,11 @@ register(
     entry_point='gym_energyplus.envs:EnergyPlusEnv',
 )
 
+import numpy as np
 from .envs.energyplus_env import EnergyPlusEnv
 from .path import get_model_filepath, get_weather_filepath, energyplus_bin_path, ENERGYPLUS_WEATHER_dict
-from .wrappers import RepeatAction, EnergyPlusWrapper, Monitor, EnergyPlusObsWrapper
+from .wrappers import RepeatAction, EnergyPlusWrapper, Monitor, EnergyPlusObsWrapper, EnergyPlusNormalizeActionWrapper, \
+    EnergyPlusGradualActionWrapper
 
 ALL_CITIES = set(ENERGYPLUS_WEATHER_dict.keys())
 
@@ -30,8 +32,16 @@ def make_env(cities, temperature_center, temp_tolerance, obs_normalize=True, num
 
     if log_dir is not None:
         env = Monitor(env, log_dir=log_dir)
+
+    action_low = np.array([temperature_center - 10., temperature_center - 10., 5., 5.])
+    action_high = np.array([temperature_center + 3., temperature_center + 3., 10., 10.])
+    action_delta = np.array([2.0, 2.0, 5.0, 5.0])
+
+    # env = EnergyPlusNormalizeActionWrapper(env=env, action_low=action_low, action_high=action_high)
+    env = EnergyPlusGradualActionWrapper(env=env, action_low=action_low, action_high=action_high,
+                                         action_delta=action_delta)
     env = EnergyPlusWrapper(env, max_steps=96 * num_days_per_episode)
     if obs_normalize:
-        env = EnergyPlusObsWrapper(env)
+        env = EnergyPlusObsWrapper(env, temperature_center)
 
     return env

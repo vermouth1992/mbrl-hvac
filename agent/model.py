@@ -6,10 +6,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchlib.common import enable_cuda, move_tensor_to_gpu, convert_numpy_to_tensor
-from torchlib.deep_rl.model_based.model import Model
-from torchlib.deep_rl.model_based.utils import EpisodicDataset as Dataset
-from torchlib.utils import normalize, unnormalize
+from torchlib.common import move_tensor_to_gpu, convert_numpy_to_tensor
+from torchlib.deep_rl.algorithm.model_based.utils import EpisodicDataset as Dataset
+from torchlib.deep_rl.algorithm.model_based.world_model import WorldModel
+from torchlib.utils.math import normalize, unnormalize
 from tqdm.auto import tqdm
 
 
@@ -59,7 +59,7 @@ class LSTMAttention(nn.Module):
         return score
 
 
-class EnergyPlusDynamicsModel(Model):
+class EnergyPlusDynamicsModel(WorldModel):
     def __init__(self, state_dim=6, action_dim=4, hidden_size=32, learning_rate=1e-3):
         self.state_mean = None
         self.state_std = None
@@ -68,11 +68,10 @@ class EnergyPlusDynamicsModel(Model):
         self.delta_state_mean = None
         self.delta_state_std = None
 
-        self.dynamics_model = LSTMAttention(state_dim=state_dim, action_dim=action_dim, hidden_size=hidden_size)
-        self.optimizer = torch.optim.Adam(self.dynamics_model.parameters(), lr=learning_rate)
+        dynamics_model = LSTMAttention(state_dim=state_dim, action_dim=action_dim, hidden_size=hidden_size)
+        optimizer = torch.optim.Adam(self.dynamics_model.parameters(), lr=learning_rate)
 
-        if enable_cuda:
-            self.dynamics_model.cuda()
+        super(EnergyPlusDynamicsModel, self).__init__(dynamics_model=dynamics_model, optimizer=optimizer)
 
     def train(self):
         self.dynamics_model.train()

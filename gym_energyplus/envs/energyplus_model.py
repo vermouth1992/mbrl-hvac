@@ -104,7 +104,6 @@ class EnergyPlusModel(metaclass=ABCMeta):
         self.action_prev = self.action
         self.action = action
         self.action = np.clip(self.action, self.action_space.low, self.action_space.high)
-        return action
 
         # self.action_prev = self.action
         # self.action = self.action_space.low + (normalized_action + 1.) * 0.5 * (

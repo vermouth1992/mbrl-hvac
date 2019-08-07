@@ -2,16 +2,15 @@ from collections import deque
 
 import numpy as np
 import torch
-from gym.spaces import Space
 from torchlib.common import map_location
 from torchlib.deep_rl import BaseAgent
-from torchlib.deep_rl.model_based.model import Model
+from torchlib.deep_rl.algorithm.model_based.world_model import WorldModel
 
 from .utils import EpisodicHistoryDataset as Dataset
 
 
 class VanillaAgent(BaseAgent):
-    def __init__(self, model: Model, planner, window_length: int, baseline_agent):
+    def __init__(self, model: WorldModel, planner, window_length: int, baseline_agent):
         self.model = model
         self.planner = planner
         self.history_states = deque(maxlen=window_length - 1)

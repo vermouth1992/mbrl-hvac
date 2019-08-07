@@ -51,7 +51,7 @@ if __name__ == '__main__':
     temperature_center = args.temp_center
     temperature_tolerance = args.temp_tolerance
 
-    log_dir = 'runs/{}_{}_{}_{}_ppo'.format(city, temperature_center, args.discount, temperature_tolerance)
+    log_dir = 'runs/{}_{}_{}_{}_ppo'.format('_'.join(city), temperature_center, args.discount, temperature_tolerance)
 
     env = make_env(city, temperature_center, temperature_tolerance, obs_normalize=True,
                    num_days_per_episode=1, log_dir=log_dir)

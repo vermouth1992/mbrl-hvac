@@ -55,23 +55,42 @@ class RepeatAction(CostFnWrapper, ModelBasedEnv):
         return obs
 
 
-class EnergyPlusGradualActionWrapper(ActionWrapper, CostFnWrapper):
+class EnergyPlusGradualActionWrapper(CostFnWrapper):
     def __init__(self, env, action_low, action_high, action_delta):
         super(EnergyPlusGradualActionWrapper, self).__init__(env=env)
-        self.action_space = spaces.Box(low=-1., high=1., shape=self.env.action_space.low.shape)
+        self.action_space = spaces.Box(low=-1., high=1., shape=self.env.action_space.low.shape, dtype=np.float32)
+        self.observation_space = spaces.Box(low=np.concatenate((self.env.observation_space.low, self.action_space.low)),
+                                            high=np.concatenate(
+                                                (self.env.observation_space.high, self.action_space.high)),
+                                            dtype=np.float32)
         self.action_low = action_low
         self.action_high = action_high
         self.action_delta = action_delta
 
     def reset(self, **kwargs):
         self.prev_action = (self.action_low + self.action_high) / 2.
-        return self.env.reset(**kwargs)
+        obs = self.env.reset(**kwargs)
+        return self.observation(obs)
 
-    def action(self, action):
+    def step(self, action: np.ndarray):
+        self.prev_action = self.action(action)
+        obs, reward, done, info = self.env.step(self.prev_action)
+        obs = self.observation(obs)
+        return obs, reward, done, info
+
+    def observation(self, observation: np.ndarray) -> np.ndarray:
+        normalized_prev_action = (2 * self.prev_action - (self.action_high + self.action_low)) \
+                                 / (self.action_high - self.action_low)
+        return np.concatenate((observation, normalized_prev_action), axis=0)
+
+    def reverse_observation(self, normalized_obs):
+        pass
+
+    def action(self, action: np.ndarray) -> np.ndarray:
         assert self.action_space.contains(action), 'Action {} not in action space'.format(action)
-        self.prev_action = np.clip(self.prev_action + action * self.action_delta,
-                                   a_min=self.action_low, a_max=self.action_high)
-        return self.prev_action
+        current_action = np.clip(self.prev_action + action * self.action_delta,
+                                 a_min=self.action_low, a_max=self.action_high)
+        return current_action
 
     def cost_fn(self, states, actions, next_states):
         pass

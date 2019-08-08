@@ -12,8 +12,8 @@ register(
 import numpy as np
 from .envs.energyplus_env import EnergyPlusEnv
 from .path import get_model_filepath, get_weather_filepath, energyplus_bin_path, ENERGYPLUS_WEATHER_dict
-from .wrappers import RepeatAction, EnergyPlusWrapper, Monitor, EnergyPlusObsWrapper, EnergyPlusNormalizeActionWrapper, \
-    EnergyPlusGradualActionWrapper
+from .wrappers import RepeatAction, EnergyPlusSplitEpisodeWrapper, Monitor, EnergyPlusObsWrapper, \
+    EnergyPlusNormalizeActionWrapper, EnergyPlusGradualActionWrapper
 
 ALL_CITIES = set(ENERGYPLUS_WEATHER_dict.keys())
 
@@ -43,6 +43,6 @@ def make_env(cities, temperature_center, temp_tolerance, obs_normalize=True, num
     # env = EnergyPlusNormalizeActionWrapper(env=env, action_low=action_low, action_high=action_high)
     env = EnergyPlusGradualActionWrapper(env=env, action_low=action_low, action_high=action_high,
                                          action_delta=action_delta)
-    env = EnergyPlusWrapper(env, max_steps=96 * num_days_per_episode)
+    env = EnergyPlusSplitEpisodeWrapper(env, max_steps=96 * num_days_per_episode)
 
     return env

@@ -69,7 +69,7 @@ class EnergyPlusDynamicsModel(WorldModel):
         self.delta_state_std = None
 
         dynamics_model = LSTMAttention(state_dim=state_dim, action_dim=action_dim, hidden_size=hidden_size)
-        optimizer = torch.optim.Adam(self.dynamics_model.parameters(), lr=learning_rate)
+        optimizer = torch.optim.Adam(dynamics_model.parameters(), lr=learning_rate)
 
         super(EnergyPlusDynamicsModel, self).__init__(dynamics_model=dynamics_model, optimizer=optimizer)
 

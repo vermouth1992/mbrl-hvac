@@ -1,6 +1,3 @@
-import os
-import shutil
-
 import numpy as np
 from torchlib.deep_rl import BaseAgent
 from torchlib.utils.random.sampler import UniformSampler
@@ -9,9 +6,7 @@ from agent.agent import VanillaAgent
 from agent.model import EnergyPlusDynamicsModel
 from agent.planner import BestRandomActionPlanner
 from agent.utils import EpisodicHistoryDataset, gather_rollouts
-from gym_energyplus.envs.energyplus_env import EnergyPlusEnv
-from gym_energyplus.path import get_model_filepath, get_weather_filepath, energyplus_bin_path, ENERGYPLUS_WEATHER_dict
-from gym_energyplus.wrappers import RepeatAction, EnergyPlusWrapper, Monitor, EnergyPlusObsWrapper
+from gym_energyplus import make_env, ALL_CITIES
 
 
 class PIDAgent(BaseAgent):
@@ -73,22 +68,14 @@ def train(city='sf',
     max_rollout_length = 96 * num_days_per_episodes  # each episode is n days
     num_on_policy_iters = 365 // num_days_per_episodes // num_on_policy_rollouts * num_years
 
-    env = EnergyPlusEnv(energyplus_file=energyplus_bin_path,
-                        model_file=get_model_filepath('temp_fan'),
-                        weather_file=get_weather_filepath(city),
-                        config={'temp_center': temperature_center, 'temp_tolerance': temp_tolerance},
-                        log_dir=None,
-                        verbose=True)
-    env = RepeatAction(env)
-
     log_dir = 'runs/{}_{}_{}_{}_{}_{}_{}_{}_model_based'.format(city, temperature_center, temp_tolerance,
                                                                 window_length, mpc_horizon,
                                                                 num_random_action_selection,
                                                                 num_on_policy_rollouts,
                                                                 training_epochs)
-    env = Monitor(env, log_dir=log_dir)
-    env = EnergyPlusWrapper(env, max_steps=max_rollout_length)
-    env = EnergyPlusObsWrapper(env)
+
+    env = make_env(city, temperature_center, temp_tolerance, obs_normalize=True,
+                   num_days_per_episode=1, log_dir=log_dir)
 
     # collect dataset using random policy
     baseline_agent = PIDAgent(target=temperature_center - 3.5)
@@ -140,7 +127,7 @@ def train(city='sf',
 def make_parser():
     from argparse import ArgumentParser
     parser = ArgumentParser()
-    parser.add_argument('--city', type=str, choices=ENERGYPLUS_WEATHER_dict.keys())
+    parser.add_argument('--city', type=str, choices=ALL_CITIES, nargs='+')
     parser.add_argument('--temp_center', type=float, default=23.5)
     parser.add_argument('--temp_tolerance', type=float, default=1.5)
     parser.add_argument('--window_length', type=int, default=20)
@@ -151,6 +138,7 @@ def make_parser():
     parser.add_argument('--training_epochs', type=int, default=60)
     parser.add_argument('--training_batch_size', type=int, default=128)
     return parser
+
 
 if __name__ == '__main__':
     parser = make_parser()
@@ -172,7 +160,7 @@ if __name__ == '__main__':
           window_length=window_length,
           num_dataset_maxlen_days=120,
           num_days_per_episodes=1,
-          num_init_random_rollouts=60,  # 56 days as initial period
+          num_init_random_rollouts=1,  # 56 days as initial period
           num_on_policy_rollouts=args['num_days_on_policy'],
           # 5 days as grace period, indicated as data distribution shift
           num_years=args['num_years'],

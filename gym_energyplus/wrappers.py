@@ -79,12 +79,23 @@ class EnergyPlusGradualActionWrapper(CostFnWrapper):
         return obs, reward, done, info
 
     def observation(self, observation: np.ndarray) -> np.ndarray:
+        """ Concatenate prev_action and observation
+
+        Args:
+            observation:
+
+        Returns:
+
+        """
         normalized_prev_action = (2 * self.prev_action - (self.action_high + self.action_low)) \
                                  / (self.action_high - self.action_low)
         return np.concatenate((observation, normalized_prev_action), axis=0)
 
     def reverse_observation(self, normalized_obs):
-        pass
+        return normalized_obs[:self.env.observation_space.low.shape[0]]
+
+    def reverse_observation_batch_tensor(self, normalized_obs):
+        return normalized_obs[:, :self.env.observation_space.low.shape[0]]
 
     def action(self, action: np.ndarray) -> np.ndarray:
         assert self.action_space.contains(action), 'Action {} not in action space'.format(action)
@@ -93,7 +104,9 @@ class EnergyPlusGradualActionWrapper(CostFnWrapper):
         return current_action
 
     def cost_fn(self, states, actions, next_states):
-        pass
+        states = self.reverse_observation_batch_tensor(states)
+        next_states = self.reverse_observation_batch_tensor(next_states)
+        return self.env.cost_fn(states, actions, next_states)
 
 
 class EnergyPlusNormalizeActionWrapper(ActionWrapper):
@@ -110,45 +123,10 @@ class EnergyPlusNormalizeActionWrapper(ActionWrapper):
 
 
 class EnergyPlusDiscreteActionWrapper(ActionWrapper):
-    def __init__(self, env, num_levels=4):
-        super(EnergyPlusDiscreteActionWrapper, self).__init__(env=env)
-        self.action_space = spaces.Discrete(num_levels ** env.action_space.shape[0])
-        self.action_table = np.linspace(-1., 1., num_levels)
-        self.num_levels = num_levels
-
-    def action(self, action):
-        """
-
-        Args:
-            action: a integer ranging from 0 to max
-
-        Returns: n * [-1, 1]
-
-        """
-        assert self.action_space.contains(action), 'Action {} is not in space {}'.format(
-            action, self.action_space)
-        binary_action = []
-        for _ in range(self.env.action_space.shape[0]):
-            remainder = action % self.num_levels
-            binary_action.append(remainder)
-            action = (action - remainder) // self.num_levels
-        action = self.action_table[binary_action]
-        return action
-
-    def reverse_action(self, action):
-        """ Find the closest action in action_table and translate to MultiDiscrete.
-            Then translate to Discrete
-
-        Args:
-            action:
-
-        Returns:
-
-        """
-        pass
+    pass
 
 
-class EnergyPlusWrapper(CostFnWrapper):
+class EnergyPlusSplitEpisodeWrapper(CostFnWrapper):
     """
     Break a super long episode env into small length episodes. Used for PPO
     1. If the user calls reset, it will remain at the originally step.
@@ -157,7 +135,7 @@ class EnergyPlusWrapper(CostFnWrapper):
     """
 
     def __init__(self, env, max_steps=96 * 5):
-        super(EnergyPlusWrapper, self).__init__(env=env)
+        super(EnergyPlusSplitEpisodeWrapper, self).__init__(env=env)
         assert max_steps > 0, 'max_steps must be greater than zero. Got {}'.format(max_steps)
         self.max_steps = max_steps
         self.true_done = True
@@ -203,7 +181,7 @@ class Monitor(CostFnWrapper):
         self.global_step = 0
         self.episode_index = 0
 
-    def step(self, action):
+    def step(self, action: np.ndarray):
         obs, reward, done, info = self.env.step(action)
         self.dump_csv(obs, action, reward)
         self.dump_tensorboard(obs, action, reward)

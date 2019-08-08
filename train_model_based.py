@@ -1,5 +1,5 @@
 import numpy as np
-from torchlib.deep_rl import BaseAgent
+from torchlib.deep_rl import BaseAgent, RandomAgent
 from torchlib.utils.random.sampler import UniformSampler
 
 from agent.agent import VanillaAgent
@@ -48,7 +48,7 @@ class PIDAgent(BaseAgent):
         return self.normalize_action(action).astype(np.float32)
 
 
-def train(city='sf',
+def train(city='SF',
           temperature_center=22.5,
           temp_tolerance=0.5,
           window_length=20,
@@ -68,7 +68,7 @@ def train(city='sf',
     max_rollout_length = 96 * num_days_per_episodes  # each episode is n days
     num_on_policy_iters = 365 // num_days_per_episodes // num_on_policy_rollouts * num_years
 
-    log_dir = 'runs/{}_{}_{}_{}_{}_{}_{}_{}_model_based'.format(city, temperature_center, temp_tolerance,
+    log_dir = 'runs/{}_{}_{}_{}_{}_{}_{}_{}_model_based'.format('_'.join(city), temperature_center, temp_tolerance,
                                                                 window_length, mpc_horizon,
                                                                 num_random_action_selection,
                                                                 num_on_policy_rollouts,
@@ -78,7 +78,8 @@ def train(city='sf',
                    num_days_per_episode=1, log_dir=log_dir)
 
     # collect dataset using random policy
-    baseline_agent = PIDAgent(target=temperature_center - 3.5)
+    # baseline_agent = PIDAgent(target=temperature_center - 3.5)
+    baseline_agent = RandomAgent(env.action_space)
     dataset = EpisodicHistoryDataset(maxlen=dataset_maxlen, window_length=window_length)
 
     print('Gathering initial dataset...')
@@ -160,7 +161,7 @@ if __name__ == '__main__':
           window_length=window_length,
           num_dataset_maxlen_days=120,
           num_days_per_episodes=1,
-          num_init_random_rollouts=1,  # 56 days as initial period
+          num_init_random_rollouts=60,  # 56 days as initial period
           num_on_policy_rollouts=args['num_days_on_policy'],
           # 5 days as grace period, indicated as data distribution shift
           num_years=args['num_years'],

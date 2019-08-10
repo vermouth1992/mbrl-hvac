@@ -5,9 +5,7 @@ Predictive model for model learning
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchlib.common import convert_numpy_to_tensor
 from torchlib.deep_rl.algorithm.model_based import DeterministicWorldModel
-from torchlib.deep_rl.algorithm.model_based.utils import EpisodicDataset as Dataset
 from torchlib.utils.math import normalize, unnormalize
 
 
@@ -67,18 +65,6 @@ class EnergyPlusDynamicsModel(DeterministicWorldModel):
         optimizer = torch.optim.Adam(dynamics_model.parameters(), lr=learning_rate)
 
         super(EnergyPlusDynamicsModel, self).__init__(dynamics_model=dynamics_model, optimizer=optimizer)
-
-    def set_statistics(self, initial_dataset: Dataset):
-        self.state_mean = convert_numpy_to_tensor(initial_dataset.state_mean).unsqueeze(dim=0)
-        self.state_std = convert_numpy_to_tensor(initial_dataset.state_std).unsqueeze(dim=0)
-        if self.dynamics_model.discrete:
-            self.action_mean = None
-            self.action_std = None
-        else:
-            self.action_mean = convert_numpy_to_tensor(initial_dataset.action_mean).unsqueeze(dim=0)
-            self.action_std = convert_numpy_to_tensor(initial_dataset.action_std).unsqueeze(dim=0)
-        self.delta_state_mean = convert_numpy_to_tensor(initial_dataset.delta_state_mean).unsqueeze(dim=0)
-        self.delta_state_std = convert_numpy_to_tensor(initial_dataset.delta_state_std).unsqueeze(dim=0)
 
     def predict_next_states(self, states, actions):
         """

@@ -94,7 +94,7 @@ def make_parser():
     parser.add_argument('--num_days_on_policy', type=int, default=10)
     parser.add_argument('--mpc_horizon', type=int, default=5)
     parser.add_argument('--gamma', type=float, default=0.95)
-    parser.add_argument('--num_init_random_rollouts', type=int, default=60)
+    parser.add_argument('--num_init_random_rollouts', type=int, default=10)
     parser.add_argument('--training_epochs', type=int, default=60)
     parser.add_argument('--training_batch_size', type=int, default=128)
     return parser

@@ -69,6 +69,13 @@ class EnergyPlusDynamicsModel(DeterministicWorldModel):
 
         super(EnergyPlusDynamicsModel, self).__init__(dynamics_model=dynamics_model, optimizer=optimizer)
 
+    def predict_normalized_delta_next_state(self, states, actions):
+        states_normalized = normalize(states, self.state_mean, self.state_std)
+        if not self.dynamics_model.discrete:
+            actions = normalize(actions, self.action_mean, self.action_std)
+        predicted_delta_state_normalized = self.dynamics_model.forward(states_normalized, actions)
+        return predicted_delta_state_normalized
+
     def fit_dynamic_model(self, dataset, epoch=10, batch_size=128, verbose=False):
         t = range(epoch)
         if verbose:
@@ -83,14 +90,11 @@ class EnergyPlusDynamicsModel(DeterministicWorldModel):
                 states = move_tensor_to_gpu(states)
                 actions = move_tensor_to_gpu(actions)
                 next_states = move_tensor_to_gpu(next_states)
-                delta_states = next_states - states
+                delta_states = next_states - states[:, -1, :]
                 # calculate loss
                 self.optimizer.zero_grad()
-                states_normalized = normalize(states, self.state_mean, self.state_std)
-                if not self.dynamics_model.discrete:
-                    actions = normalize(actions, self.action_mean, self.action_std)
+                predicted_delta_state_normalized = self.predict_normalized_delta_next_state(states, actions)
                 delta_states_normalized = normalize(delta_states, self.delta_state_mean, self.delta_state_std)
-                predicted_delta_state_normalized = self.dynamics_model.forward(states_normalized, actions)
                 loss = F.mse_loss(predicted_delta_state_normalized, delta_states_normalized)
 
                 loss.backward()
@@ -105,12 +109,9 @@ class EnergyPlusDynamicsModel(DeterministicWorldModel):
                     states = move_tensor_to_gpu(states)
                     actions = move_tensor_to_gpu(actions)
                     next_states = move_tensor_to_gpu(next_states)
-                    delta_states = next_states - states
-                    states_normalized = normalize(states, self.state_mean, self.state_std)
-                    if not self.dynamics_model.discrete:
-                        actions = normalize(actions, self.action_mean, self.action_std)
+                    delta_states = next_states - states[:, -1, :]
+                    predicted_delta_state_normalized = self.predict_normalized_delta_next_state(states, actions)
                     delta_states_normalized = normalize(delta_states, self.delta_state_mean, self.delta_state_std)
-                    predicted_delta_state_normalized = self.dynamics_model.forward(states_normalized, actions)
                     loss = F.mse_loss(predicted_delta_state_normalized, delta_states_normalized)
                     val_losses.append(loss.item())
             self.train()

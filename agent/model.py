@@ -2,11 +2,14 @@
 Predictive model for model learning
 """
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchlib.common import move_tensor_to_gpu
 from torchlib.deep_rl.algorithm.model_based import DeterministicWorldModel
 from torchlib.utils.math import normalize, unnormalize
+from tqdm.auto import tqdm
 
 
 class LSTMAttention(nn.Module):
@@ -65,6 +68,56 @@ class EnergyPlusDynamicsModel(DeterministicWorldModel):
         optimizer = torch.optim.Adam(dynamics_model.parameters(), lr=learning_rate)
 
         super(EnergyPlusDynamicsModel, self).__init__(dynamics_model=dynamics_model, optimizer=optimizer)
+
+    def fit_dynamic_model(self, dataset, epoch=10, batch_size=128, verbose=False):
+        t = range(epoch)
+        if verbose:
+            t = tqdm(t)
+
+        train_data_loader, val_data_loader = dataset.random_iterator(batch_size=batch_size)
+
+        for i in t:
+            losses = []
+            for states, actions, next_states, _, _ in train_data_loader:
+                # convert to tensor
+                states = move_tensor_to_gpu(states)
+                actions = move_tensor_to_gpu(actions)
+                next_states = move_tensor_to_gpu(next_states)
+                delta_states = next_states - states
+                # calculate loss
+                self.optimizer.zero_grad()
+                states_normalized = normalize(states, self.state_mean, self.state_std)
+                if not self.dynamics_model.discrete:
+                    actions = normalize(actions, self.action_mean, self.action_std)
+                delta_states_normalized = normalize(delta_states, self.delta_state_mean, self.delta_state_std)
+                predicted_delta_state_normalized = self.dynamics_model.forward(states_normalized, actions)
+                loss = F.mse_loss(predicted_delta_state_normalized, delta_states_normalized)
+
+                loss.backward()
+                self.optimizer.step()
+                losses.append(loss.item())
+
+            self.eval()
+            val_losses = []
+            with torch.no_grad():
+                for states, actions, next_states, _, _ in val_data_loader:
+                    # convert to tensor
+                    states = move_tensor_to_gpu(states)
+                    actions = move_tensor_to_gpu(actions)
+                    next_states = move_tensor_to_gpu(next_states)
+                    delta_states = next_states - states
+                    states_normalized = normalize(states, self.state_mean, self.state_std)
+                    if not self.dynamics_model.discrete:
+                        actions = normalize(actions, self.action_mean, self.action_std)
+                    delta_states_normalized = normalize(delta_states, self.delta_state_mean, self.delta_state_std)
+                    predicted_delta_state_normalized = self.dynamics_model.forward(states_normalized, actions)
+                    loss = F.mse_loss(predicted_delta_state_normalized, delta_states_normalized)
+                    val_losses.append(loss.item())
+            self.train()
+
+            if verbose:
+                t.set_description('Epoch {}/{} - Avg model train loss: {:.4f} - Avg model val loss: {:.4f}'.format(
+                    i + 1, epoch, np.mean(losses), np.mean(val_losses)))
 
     def predict_next_states(self, states, actions):
         """

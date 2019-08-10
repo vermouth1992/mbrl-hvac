@@ -18,7 +18,8 @@ from .wrappers import RepeatAction, EnergyPlusSplitEpisodeWrapper, Monitor, Ener
 ALL_CITIES = set(ENERGYPLUS_WEATHER_dict.keys())
 
 
-def make_env(cities, temperature_center, temp_tolerance, obs_normalize=True, num_days_per_episode=1, log_dir=None):
+def make_env(cities, temperature_center, temp_tolerance, obs_normalize=True, action_normalize=True,
+             num_days_per_episode=1, log_dir=None):
     env = EnergyPlusEnv(energyplus_file=energyplus_bin_path,
                         model_file=get_model_filepath('temp_fan'),
                         weather_file=get_weather_filepath(cities),
@@ -36,13 +37,15 @@ def make_env(cities, temperature_center, temp_tolerance, obs_normalize=True, num
     if obs_normalize:
         env = EnergyPlusObsWrapper(env, temperature_center)
 
-    action_low = np.array([temperature_center - 15., temperature_center - 15., 2.5, 2.5])
-    action_high = np.array([temperature_center + 10., temperature_center + 10., 10., 10.])
-    action_delta = np.array([2.0, 2.0, 2.5, 2.5])
+    if action_normalize:
+        action_low = np.array([temperature_center - 15., temperature_center - 15., 2.5, 2.5])
+        action_high = np.array([temperature_center + 10., temperature_center + 10., 10., 10.])
+        action_delta = np.array([2.0, 2.0, 2.5, 2.5])
 
-    # env = EnergyPlusNormalizeActionWrapper(env=env, action_low=action_low, action_high=action_high)
-    env = EnergyPlusGradualActionWrapper(env=env, action_low=action_low, action_high=action_high,
-                                         action_delta=action_delta)
+        # env = EnergyPlusNormalizeActionWrapper(env=env, action_low=action_low, action_high=action_high)
+        env = EnergyPlusGradualActionWrapper(env=env, action_low=action_low, action_high=action_high,
+                                             action_delta=action_delta)
+
     env = EnergyPlusSplitEpisodeWrapper(env, max_steps=96 * num_days_per_episode)
 
     return env

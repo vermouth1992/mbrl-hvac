@@ -1,54 +1,13 @@
 import numpy as np
-from torchlib.deep_rl import BaseAgent, RandomAgent
+from torchlib.deep_rl import RandomAgent
 from torchlib.utils.random.sampler import UniformSampler
 
-from agent.agent import VanillaAgent
-from agent.model import EnergyPlusDynamicsModel
-from agent.planner import BestRandomActionPlanner
+from agent import ModelBasedHistoryPlanAgent, EnergyPlusDynamicsModel, BestRandomActionHistoryPlanner
 from agent.utils import EpisodicHistoryDataset, gather_rollouts
 from gym_energyplus import make_env, ALL_CITIES
 
 
-class PIDAgent(BaseAgent):
-    def __init__(self, target, sensitivity=1.0, alpha=0.4):
-        self.sensitivity = sensitivity
-        self.act_west_prev = target
-        self.act_east_prev = target
-        self.alpha = alpha
-        self.target = target
-
-        self.lo = 10.0
-        self.hi = 40.0
-        self.flow_hi = 7.0
-        self.flow_lo = self.flow_hi * 0.25
-
-        self.default_flow = self.flow_hi
-
-        self.low = np.array([self.lo, self.lo, self.flow_lo, self.flow_lo])
-        self.high = np.array([self.hi, self.hi, self.flow_hi, self.flow_hi])
-
-    def normalize_action(self, action):
-        action = ((action - self.low) / (self.high - self.low) - 0.5) * 2.
-        return action
-
-    def predict(self, state):
-        delta_west = state[1] - self.target
-        act_west = self.target - delta_west * self.sensitivity
-        act_west = act_west * self.alpha + self.act_west_prev * (1 - self.alpha)
-        self.act_west_prev = act_west
-
-        delta_east = state[2] - self.target
-        act_east = self.target - delta_east * self.sensitivity
-        act_east = act_east * self.alpha + self.act_east_prev * (1 - self.alpha)
-        self.act_east_prev = act_east
-
-        act_west = max(self.lo, min(act_west, self.hi))
-        act_east = max(self.lo, min(act_east, self.hi))
-        action = np.array([act_west, act_east, self.default_flow, self.default_flow])
-        return self.normalize_action(action).astype(np.float32)
-
-
-def train(city='SF',
+def train(city=('SF'),
           temperature_center=22.5,
           temp_tolerance=0.5,
           window_length=20,
@@ -78,7 +37,6 @@ def train(city='SF',
                    num_days_per_episode=1, log_dir=log_dir)
 
     # collect dataset using random policy
-    # baseline_agent = PIDAgent(target=temperature_center - 3.5)
     baseline_agent = RandomAgent(env.action_space)
     dataset = EpisodicHistoryDataset(maxlen=dataset_maxlen, window_length=window_length)
 
@@ -94,11 +52,11 @@ def train(city='SF',
     print('Action space low = {}, high = {}'.format(env.action_space.low, env.action_space.high))
 
     action_sampler = UniformSampler(low=env.action_space.low, high=env.action_space.high)
-    planner = BestRandomActionPlanner(model, action_sampler, env.cost_fn, horizon=mpc_horizon,
-                                      num_random_action_selection=num_random_action_selection,
-                                      gamma=gamma)
+    planner = BestRandomActionHistoryPlanner(model, action_sampler, env.cost_fn, horizon=mpc_horizon,
+                                             num_random_action_selection=num_random_action_selection,
+                                             gamma=gamma)
 
-    agent = VanillaAgent(model, planner, window_length, baseline_agent)
+    agent = ModelBasedHistoryPlanAgent(model, planner, window_length, baseline_agent)
 
     # gather new rollouts using MPC and retrain dynamics model
     for num_iter in range(num_on_policy_iters):
@@ -136,6 +94,7 @@ def make_parser():
     parser.add_argument('--num_days_on_policy', type=int, default=10)
     parser.add_argument('--mpc_horizon', type=int, default=5)
     parser.add_argument('--gamma', type=float, default=0.95)
+    parser.add_argument('--num_init_random_rollouts', type=int, default=60)
     parser.add_argument('--training_epochs', type=int, default=60)
     parser.add_argument('--training_batch_size', type=int, default=128)
     return parser
@@ -161,7 +120,7 @@ if __name__ == '__main__':
           window_length=window_length,
           num_dataset_maxlen_days=120,
           num_days_per_episodes=1,
-          num_init_random_rollouts=60,  # 56 days as initial period
+          num_init_random_rollouts=args['num_init_random_rollouts'],  # 56 days as initial period
           num_on_policy_rollouts=args['num_days_on_policy'],
           # 5 days as grace period, indicated as data distribution shift
           num_years=args['num_years'],

@@ -1,155 +1,78 @@
-from collections import OrderedDict, deque, namedtuple
-
 import numpy as np
+from sklearn.model_selection import train_test_split
 from torchlib.dataset.utils import create_data_loader
+from torchlib.deep_rl import BaseAgent
+from torchlib.deep_rl.algorithm.model_based.utils import EpisodicDataset
 
-Transition = namedtuple('Transition', ('state', 'action', 'reward'))
-ImitationTransition = namedtuple('ImitationTransition', ('state', 'action', 'reward', 'best_action'))
 
-
-class EpisodicHistoryDataset(object):
+class EpisodicHistoryDataset(EpisodicDataset):
     def __init__(self, maxlen=10000, window_length=20):
-        self.memory = deque()
-        # current state
-        self._states = []
-        self._actions = []
-        self._rewards = []
-        self.size = 0
-
-        self.maxlen = maxlen
+        super(EpisodicHistoryDataset, self).__init__(maxlen=maxlen)
         self.window_length = window_length
-
-    def __len__(self):
-        return self.size
-
-    @property
-    def num_trajectories(self):
-        return len(self.memory)
-
-    @property
-    def is_empty(self):
-        return len(self) == 0
 
     @property
     def state_mean(self):
         states = []
         for trajectory in self.memory:
             states.append(trajectory.state)
-        return np.mean(np.concatenate(states, axis=0), axis=0)
+        return np.mean(np.concatenate(states, axis=0), axis=0, keepdims=True)
 
     @property
     def state_std(self):
         states = []
         for trajectory in self.memory:
             states.append(trajectory.state)
-        return np.std(np.concatenate(states, axis=0), axis=0)
+        return np.std(np.concatenate(states, axis=0), axis=0, keepdims=True)
 
     @property
     def action_mean(self):
         actions = []
         for trajectory in self.memory:
             actions.append(trajectory.action)
-        return np.mean(np.concatenate(actions, axis=0), axis=0).astype(np.float32)
+        return np.mean(np.concatenate(actions, axis=0), axis=0, keepdims=True)
 
     @property
     def action_std(self):
         actions = []
         for trajectory in self.memory:
             actions.append(trajectory.action)
-        return np.std(np.concatenate(actions, axis=0), axis=0).astype(np.float32)
+        return np.std(np.concatenate(actions, axis=0), axis=0, keepdims=True)
 
-    @property
-    def delta_state_mean(self):
-        delta_states = []
-        for trajectory in self.memory:
-            states = trajectory.state
-            delta_states.append(states[1:] - states[:-1])
-        return np.mean(np.concatenate(delta_states, axis=0), axis=0)
-
-    @property
-    def delta_state_std(self):
-        delta_states = []
-        for trajectory in self.memory:
-            states = trajectory.state
-            delta_states.append(states[1:] - states[:-1])
-        return np.std(np.concatenate(delta_states, axis=0), axis=0)
-
-    @property
-    def reward_mean(self):
-        rewards = []
-        for trajectory in self.memory:
-            rewards.append(trajectory.reward)
-        return np.mean(np.concatenate(rewards, axis=0), axis=0).astype(np.float32)
-
-    @property
-    def reward_std(self):
-        rewards = []
-        for trajectory in self.memory:
-            rewards.append(trajectory.reward)
-        return np.std(np.concatenate(rewards, axis=0), axis=0).astype(np.float32)
-
-    def add(self, state, action, next_state, reward, done):
-        self._states.append(np.ravel(state))
-        if isinstance(action, np.ndarray) and len(action.shape) != 0:
-            self._actions.append(np.ravel(action))
-        else:
-            self._actions.append(action)
-        self._rewards.append(np.ravel(reward))
-
-        self.size += 1
-
-        if done:
-            self._states.append(next_state)
-            self.memory.append(Transition(state=np.array(self._states),
-                                          action=np.array(self._actions),
-                                          reward=np.array(self._rewards)))
-            self._states = []
-            self._actions = []
-            self._rewards = []
-
-    def append(self, other_dataset):
-        self.memory.extend(other_dataset.memory)
-        self.size += other_dataset.size
-
-        while self.size > self.maxlen:
-            trajectory = self.memory.popleft()
-            self.size -= len(trajectory.action)
-
-    def random_iterator(self, batch_size):
+    def random_iterator(self, batch_size, train_val_split_ratio=0.2):
         states = []
         actions = []
-        delta_states = []
+        next_states = []
+        rewards = []
+        dones = []
         for trajectory in self.memory:
             for i in range(self.window_length, trajectory.state.shape[0]):
                 states.append(trajectory.state[i - self.window_length:i])
-                delta_states.append(trajectory.state[i] - trajectory.state[i - 1])
+                next_states.append(trajectory.state[i])
                 actions.append(trajectory.action[i - self.window_length:i])
+            rewards.append(trajectory.reward[self.window_length - 1:])
+            done = [False] * (trajectory.action.shape[0] - self.window_length + 1)
+            done[-1] = True
+            dones.append(np.array(done))
 
         states = np.stack(states, axis=0)
         actions = np.stack(actions, axis=0)
-        delta_states = np.stack(delta_states, axis=0)
+        next_states = np.stack(next_states, axis=0)
+        rewards = np.concatenate(rewards, axis=0)
+        dones = np.concatenate(dones, axis=0)
 
-        data_loader = create_data_loader((states, actions, delta_states), batch_size=batch_size, shuffle=True,
-                                         drop_last=False)
+        input_tuple = (states, actions, next_states, rewards, dones)
 
-        return data_loader
+        output_tuple = train_test_split(*input_tuple, test_size=train_val_split_ratio)
 
-    def log(self):
-        returns = []
+        train_tuple = output_tuple[0::2]
+        val_tuple = output_tuple[1::2]
 
-        for trajectory in self.memory:
-            returns.append(np.sum(trajectory.reward))
+        train_data_loader = create_data_loader(train_tuple, batch_size=batch_size, shuffle=True,
+                                               drop_last=False)
+        val_data_loader = create_data_loader(val_tuple, batch_size=batch_size, shuffle=True,
+                                             drop_last=False)
 
-        stats = OrderedDict({
-            'ReturnAvg': np.mean(returns),
-            'ReturnStd': np.std(returns),
-            'ReturnMin': np.min(returns),
-            'ReturnMax': np.max(returns)
-        })
-        return stats
-
-
-from torchlib.deep_rl import BaseAgent
+        return train_data_loader, val_data_loader
 
 
 def gather_rollouts(env, policy: BaseAgent, num_rollouts, max_rollout_length):

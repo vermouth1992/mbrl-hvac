@@ -1,18 +1,12 @@
 from collections import deque
 
 import numpy as np
-import torch
-from torchlib.common import map_location
-from torchlib.deep_rl import BaseAgent
-from torchlib.deep_rl.algorithm.model_based.world_model import WorldModel
-
-from .utils import EpisodicHistoryDataset as Dataset
+from torchlib.deep_rl.algorithm.model_based import ModelBasedPlanAgent
 
 
-class VanillaAgent(BaseAgent):
-    def __init__(self, model: WorldModel, planner, window_length: int, baseline_agent):
-        self.model = model
-        self.planner = planner
+class ModelBasedHistoryPlanAgent(ModelBasedPlanAgent):
+    def __init__(self, model, planner, window_length: int, baseline_agent):
+        super(ModelBasedHistoryPlanAgent, self).__init__(model=model, planner=planner)
         self.history_states = deque(maxlen=window_length - 1)
         self.history_actions = deque(maxlen=window_length - 1)
         self.baseline_agent = baseline_agent
@@ -21,25 +15,8 @@ class VanillaAgent(BaseAgent):
         """ Only reset on True done of one episode. """
         self.history_states.clear()
 
-    def train(self):
-        self.model.train()
-
-    def test(self):
-        self.model.test()
-
-    def save_checkpoint(self, checkpoint_path):
-        print('Saving checkpoint to {}'.format(checkpoint_path))
-        torch.save(self.model.state_dict, checkpoint_path)
-
-    def load_checkpoint(self, checkpoint_path):
-        states = torch.load(checkpoint_path, map_location=map_location)
-        self.model.load_state_dict(states)
-
-    def set_statistics(self, initial_dataset: Dataset):
-        self.model.set_statistics(initial_dataset)
-
     def predict(self, state):
-        self.test()
+        self.model.eval()
         if len(self.history_states) < self.history_states.maxlen:
             action = self.baseline_agent.predict(state)
         else:
@@ -47,7 +24,3 @@ class VanillaAgent(BaseAgent):
         self.history_states.append(state)
         self.history_actions.append(action)
         return action
-
-    def fit_dynamic_model(self, dataset: Dataset, epoch=60, batch_size=128, verbose=False):
-        self.train()
-        self.model.fit_dynamic_model(dataset, epoch, batch_size, verbose)

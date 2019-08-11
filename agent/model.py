@@ -20,7 +20,7 @@ class LSTMAttention(nn.Module):
         self.lstm = nn.LSTM(input_size=feature_dim, hidden_size=hidden_size, num_layers=1, batch_first=True,
                             bidirectional=False)
         self.attention_matrix = nn.Parameter(torch.randn(hidden_size, 1), requires_grad=True)
-        # self.dropout = nn.Dropout(0.5)
+        self.dropout = nn.Dropout(0.1)
         self.out_linear = nn.Linear(hidden_size, state_dim)
 
     def forward(self, state, action):
@@ -51,7 +51,7 @@ class LSTMAttention(nn.Module):
 
         h = torch.tanh(r)
 
-        # h = self.dropout.forward(h)
+        h = self.dropout.forward(h)
 
         score = self.out_linear.forward(h)
 

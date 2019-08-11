@@ -39,8 +39,8 @@ def make_env(cities, temperature_center, temp_tolerance, obs_normalize=True, act
 
     if action_normalize:
         action_low = np.array([temperature_center - 15., temperature_center - 15., 2.5, 2.5])
-        action_high = np.array([temperature_center + 10., temperature_center + 10., 10., 10.])
-        action_delta = np.array([2.0, 2.0, 2.5, 2.5])
+        action_high = np.array([temperature_center + 0., temperature_center + 0., 10., 10.])
+        action_delta = np.array([1.0, 1.0, 1.0, 1.0])
 
         # env = EnergyPlusNormalizeActionWrapper(env=env, action_low=action_low, action_high=action_high)
         env = EnergyPlusGradualActionWrapper(env=env, action_low=action_low, action_high=action_high,

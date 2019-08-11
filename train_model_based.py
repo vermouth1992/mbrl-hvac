@@ -25,7 +25,8 @@ def train(city=('SF'),
           checkpoint_path=None):
     dataset_maxlen = 96 * num_days_per_episodes * num_dataset_maxlen_days  # the dataset contains 8 weeks of historical data
     max_rollout_length = 96 * num_days_per_episodes  # each episode is n days
-    num_on_policy_iters = 365 // num_days_per_episodes // num_on_policy_rollouts * num_years
+    num_on_policy_iters = (365 * num_years // num_days_per_episodes -
+                           num_init_random_rollouts) // num_on_policy_rollouts
 
     log_dir = 'runs/{}_{}_{}_{}_{}_{}_{}_{}_model_based'.format('_'.join(city), temperature_center, temp_tolerance,
                                                                 window_length, mpc_horizon,
@@ -91,12 +92,14 @@ def make_parser():
     parser.add_argument('--temp_tolerance', type=float, default=1.5)
     parser.add_argument('--window_length', type=int, default=20)
     parser.add_argument('--num_years', type=int, default=3)
-    parser.add_argument('--num_days_on_policy', type=int, default=10)
+    parser.add_argument('--num_days_on_policy', type=int, default=15)
     parser.add_argument('--mpc_horizon', type=int, default=5)
     parser.add_argument('--gamma', type=float, default=0.95)
     parser.add_argument('--num_init_random_rollouts', type=int, default=10)
     parser.add_argument('--training_epochs', type=int, default=60)
     parser.add_argument('--training_batch_size', type=int, default=128)
+    parser.add_argument('--num_dataset_maxlen_days', type=int, default=120)
+    parser.add_argument('--num_random_action_selection', type=int, default=8192)
     return parser
 
 
@@ -109,16 +112,11 @@ if __name__ == '__main__':
 
     pprint.pprint(args)
 
-    city = args['city']
-    temperature_center = args['temp_center']
-    temp_tolerance = args['temp_tolerance']
-    window_length = args['window_length']
-
-    train(city=city,
-          temperature_center=temperature_center,
-          temp_tolerance=temp_tolerance,
-          window_length=window_length,
-          num_dataset_maxlen_days=120,
+    train(city=args['city'],
+          temperature_center=args['temp_center'],
+          temp_tolerance=args['temp_tolerance'],
+          window_length=args['window_length'],
+          num_dataset_maxlen_days=args['num_dataset_maxlen_days'],
           num_days_per_episodes=1,
           num_init_random_rollouts=args['num_init_random_rollouts'],  # 56 days as initial period
           num_on_policy_rollouts=args['num_days_on_policy'],
@@ -126,7 +124,7 @@ if __name__ == '__main__':
           num_years=args['num_years'],
           mpc_horizon=args['mpc_horizon'],
           gamma=args['gamma'],
-          num_random_action_selection=8192,
+          num_random_action_selection=args['num_random_action_selection'],
           training_epochs=args['training_epochs'],
           training_batch_size=args['training_batch_size'],
           verbose=True,

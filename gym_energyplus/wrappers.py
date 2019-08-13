@@ -94,6 +94,9 @@ class EnergyPlusGradualActionWrapper(CostFnWrapper):
     def reverse_observation(self, normalized_obs):
         return normalized_obs[:self.env.observation_space.low.shape[0]]
 
+    def reverse_observation_batch(self, normalized_obs):
+        return normalized_obs[:, :self.env.observation_space.low.shape[0]]
+
     def reverse_observation_batch_tensor(self, normalized_obs):
         return normalized_obs[:, :self.env.observation_space.low.shape[0]]
 
@@ -235,6 +238,14 @@ class EnergyPlusObsWrapper(ObservationWrapper, CostFnWrapper):
         obs = normalized_obs * self.obs_max + self.obs_mean
         total_power = obs[3] + obs[4]
         obs = np.insert(obs, 3, total_power)
+        return obs
+
+    def reverse_observation_batch(self, normalized_obs):
+        assert isinstance(normalized_obs, np.ndarray), 'normalized_obs must be np.ndarray. Got {}'.format(
+            type(normalized_obs))
+        obs = normalized_obs * np.expand_dims(self.obs_max, axis=0) + np.expand_dims(self.obs_mean, axis=0)
+        total_power = obs[:, 3:4] + obs[:, 4:5]
+        obs = np.concatenate((obs[:, :3], total_power, obs[:, 3:]))
         return obs
 
     def observation(self, observation):

@@ -1,3 +1,5 @@
+import random
+
 import numpy as np
 from sklearn.model_selection import train_test_split
 from torchlib.dataset.utils import create_data_loader
@@ -37,6 +39,10 @@ class EpisodicHistoryDataset(EpisodicDataset):
         for trajectory in self.memory:
             actions.append(trajectory.action)
         return np.std(np.concatenate(actions, axis=0), axis=0, keepdims=True)
+
+    def random_rollout(self):
+        trajectory = random.choice(self.memory)
+        return trajectory.state, trajectory.action, trajectory.reward
 
     def random_iterator(self, batch_size, train_val_split_ratio=0.2):
         states = []

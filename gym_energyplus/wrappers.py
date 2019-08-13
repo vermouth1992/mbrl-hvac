@@ -245,7 +245,7 @@ class EnergyPlusObsWrapper(ObservationWrapper, CostFnWrapper):
             type(normalized_obs))
         obs = normalized_obs * np.expand_dims(self.obs_max, axis=0) + np.expand_dims(self.obs_mean, axis=0)
         total_power = obs[:, 3:4] + obs[:, 4:5]
-        obs = np.concatenate((obs[:, :3], total_power, obs[:, 3:]))
+        obs = np.concatenate((obs[:, :3], total_power, obs[:, 3:]), axis=-1)
         return obs
 
     def observation(self, observation):

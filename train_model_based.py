@@ -91,15 +91,18 @@ def make_parser():
     parser.add_argument('--temp_center', type=float, default=23.5)
     parser.add_argument('--temp_tolerance', type=float, default=1.5)
     parser.add_argument('--window_length', type=int, default=20)
-    parser.add_argument('--num_years', type=int, default=3)
-    parser.add_argument('--num_days_on_policy', type=int, default=15)
-    parser.add_argument('--mpc_horizon', type=int, default=5)
+    parser.add_argument('--num_years', type=int, default=2)
     parser.add_argument('--gamma', type=float, default=0.95)
-    parser.add_argument('--num_init_random_rollouts', type=int, default=10)
-    parser.add_argument('--training_epochs', type=int, default=60)
+    parser.add_argument('--num_init_random_rollouts', type=int, default=65)
     parser.add_argument('--training_batch_size', type=int, default=128)
     parser.add_argument('--num_dataset_maxlen_days', type=int, default=120)
     parser.add_argument('--num_random_action_selection', type=int, default=8192)
+
+    parser.add_argument('--mpc_horizon', type=int, default=5)
+    parser.add_argument('--num_days_on_policy', type=int, default=15)
+    parser.add_argument('--training_epochs', type=int, default=60)
+
+
     return parser
 
 

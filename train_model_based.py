@@ -2,7 +2,8 @@ import numpy as np
 from torchlib.deep_rl import RandomAgent
 from torchlib.utils.random.sampler import UniformSampler
 
-from agent import ModelBasedHistoryPlanAgent, EnergyPlusDynamicsModel, BestRandomActionHistoryPlanner
+from agent import ModelBasedHistoryPlanAgent, ModelBasedHistoryDaggerAgent, EnergyPlusDynamicsModel, \
+    BestRandomActionHistoryPlanner
 from agent.utils import EpisodicHistoryDataset, gather_rollouts
 from gym_energyplus import make_env, ALL_CITIES
 
@@ -21,6 +22,7 @@ def train(city=('SF'),
           num_random_action_selection=4096,
           training_epochs=60,
           training_batch_size=128,
+          dagger=False,
           verbose=True,
           checkpoint_path=None):
     dataset_maxlen = 96 * num_days_per_episodes * num_dataset_maxlen_days  # the dataset contains 8 weeks of historical data
@@ -56,8 +58,14 @@ def train(city=('SF'),
     planner = BestRandomActionHistoryPlanner(model, action_sampler, env.cost_fn, horizon=mpc_horizon,
                                              num_random_action_selection=num_random_action_selection,
                                              gamma=gamma)
-
-    agent = ModelBasedHistoryPlanAgent(model, planner, window_length, baseline_agent)
+    if dagger:
+        agent = ModelBasedHistoryDaggerAgent(model=model, planner=planner, policy_data_size=1000,
+                                             window_length=window_length, baseline_agent=baseline_agent,
+                                             state_dim=env.observation_space.shape[0],
+                                             action_dim=env.action_space.shape[0],
+                                             hidden_size=32)
+    else:
+        agent = ModelBasedHistoryPlanAgent(model, planner, window_length, baseline_agent)
 
     # gather new rollouts using MPC and retrain dynamics model
     for num_iter in range(num_on_policy_iters):
@@ -101,7 +109,7 @@ def make_parser():
     parser.add_argument('--mpc_horizon', type=int, default=5)
     parser.add_argument('--num_days_on_policy', type=int, default=15)
     parser.add_argument('--training_epochs', type=int, default=60)
-
+    parser.add_argument('--dagger', action='store_true')
 
     return parser
 
@@ -130,5 +138,6 @@ if __name__ == '__main__':
           num_random_action_selection=args['num_random_action_selection'],
           training_epochs=args['training_epochs'],
           training_batch_size=args['training_batch_size'],
+          dagger=args['dagger'],
           verbose=True,
           checkpoint_path=None)

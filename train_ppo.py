@@ -27,7 +27,7 @@ def make_parser():
     parser.add_argument('--clip_param', type=float, default=0.2)
     parser.add_argument('--entropy_coef', type=float, default=0.01)
     parser.add_argument('--value_coef', type=float, default=1.0)
-    parser.add_argument('--n_iter', '-n', type=int, default=500)
+    parser.add_argument('--n_iter', '-n', type=int, default=100)
     parser.add_argument('--batch_size', '-b', type=int, default=96 * 73)
     parser.add_argument('--recurrent', '-re', action='store_true')
     parser.add_argument('--hidden_size', type=int, default=20)

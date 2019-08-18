@@ -158,6 +158,10 @@ class LSTMOutput(nn.Module):
         super(LSTMOutput, self).__init__()
         self.lstm = nn.LSTM(input_size=state_dim + action_dim, hidden_size=hidden_size, num_layers=1,
                             batch_first=True, bidirectional=False)
+        self.linear = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
+        )
 
     def forward(self, state):
         out = self.lstm.forward(state)[0][:, -1, :]

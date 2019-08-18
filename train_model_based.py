@@ -30,11 +30,12 @@ def train(city=('SF'),
     num_on_policy_iters = (365 * num_years // num_days_per_episodes -
                            num_init_random_rollouts) // num_on_policy_rollouts
 
-    log_dir = 'runs/{}_{}_{}_{}_{}_{}_{}_{}_model_based'.format('_'.join(city), temperature_center, temp_tolerance,
-                                                                window_length, mpc_horizon,
-                                                                num_random_action_selection,
-                                                                num_on_policy_rollouts,
-                                                                training_epochs)
+    log_dir = 'runs/{}_{}_{}_{}_{}_{}_{}_{}_{}_model_based'.format('_'.join(city), temperature_center, temp_tolerance,
+                                                                   window_length, mpc_horizon,
+                                                                   num_random_action_selection,
+                                                                   num_on_policy_rollouts,
+                                                                   training_epochs,
+                                                                   dagger)
 
     env = make_env(city, temperature_center, temp_tolerance, obs_normalize=True,
                    num_days_per_episode=1, log_dir=log_dir)
@@ -76,6 +77,8 @@ def train(city=('SF'),
         agent.set_statistics(dataset)
         agent.fit_dynamic_model(dataset=dataset, epoch=training_epochs, batch_size=training_batch_size,
                                 verbose=verbose)
+        agent.fit_policy(dataset=dataset, epoch=training_epochs, batch_size=training_batch_size,
+                         verbose=verbose)
         on_policy_dataset = gather_rollouts(env, agent, num_on_policy_rollouts, max_rollout_length)
 
         # record on policy dataset statistics

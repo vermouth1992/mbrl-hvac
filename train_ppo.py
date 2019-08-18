@@ -12,7 +12,7 @@ import gym.spaces
 import numpy as np
 import torch.optim
 from torchlib import deep_rl
-from torchlib.deep_rl.models import CategoricalNNPolicy, BetaNNPolicy
+from agent.model import EnergyPlusPPOContinuousPolicy
 from torchlib.utils.random import set_global_seeds
 
 from gym_energyplus import make_env, ALL_CITIES
@@ -29,14 +29,13 @@ def make_parser():
     parser.add_argument('--value_coef', type=float, default=1.0)
     parser.add_argument('--n_iter', '-n', type=int, default=100)
     parser.add_argument('--batch_size', '-b', type=int, default=96 * 73)
-    parser.add_argument('--recurrent', '-re', action='store_true')
-    parser.add_argument('--hidden_size', type=int, default=20)
     parser.add_argument('--learning_rate', '-lr', type=float, default=5e-3)
     parser.add_argument('--nn_size', '-s', type=int, default=64)
     parser.add_argument('--seed', type=int, default=1)
     parser.add_argument('--city', type=str, choices=ALL_CITIES, nargs='+')
     parser.add_argument('--temp_center', type=float, default=23.5)
     parser.add_argument('--temp_tolerance', type=float, default=1.5)
+    parser.add_argument('--window_length', type=int, default=20)
     return parser
 
 
@@ -54,7 +53,7 @@ if __name__ == '__main__':
     log_dir = 'runs/{}_{}_{}_{}_ppo'.format('_'.join(city), temperature_center, args.discount, temperature_tolerance)
 
     env = make_env(city, temperature_center, temperature_tolerance, obs_normalize=True,
-                   num_days_per_episode=1, log_dir=log_dir)
+                   num_days_per_episode=1, window_length=args.window_length, log_dir=log_dir)
 
     discrete = isinstance(env.action_space, gym.spaces.Discrete)
 
@@ -66,28 +65,16 @@ if __name__ == '__main__':
     ob_dim = env.observation_space.shape[0]
     ac_dim = env.action_space.n if discrete else env.action_space.shape[0]
 
-    recurrent = args.recurrent
-    hidden_size = args.hidden_size
-
     if discrete:
-        policy_net = CategoricalNNPolicy(nn_size=args.nn_size, state_dim=ob_dim, action_dim=ac_dim,
-                                         recurrent=recurrent, hidden_size=hidden_size)
+        policy_net = None
     else:
-        policy_net = BetaNNPolicy(nn_size=args.nn_size, state_dim=ob_dim, action_dim=ac_dim,
-                                  recurrent=recurrent, hidden_size=hidden_size)
+        policy_net = EnergyPlusPPOContinuousPolicy(state_dim=ob_dim, action_dim=ac_dim, hidden_size=args.nn_size)
 
     policy_optimizer = torch.optim.Adam(policy_net.parameters(), args.learning_rate)
 
-    gae_lambda = args.gae_lambda
-
-    if recurrent:
-        init_hidden_unit = np.zeros(shape=(hidden_size))
-    else:
-        init_hidden_unit = None
-
     agent = deep_rl.algorithm.ppo.PPOAgent(policy_net, policy_optimizer,
-                                           init_hidden_unit=init_hidden_unit,
-                                           lam=gae_lambda,
+                                           init_hidden_unit=None,
+                                           lam=args.gae_lambda,
                                            clip_param=args.clip_param,
                                            entropy_coef=args.entropy_coef, value_coef=args.value_coef)
 

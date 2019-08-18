@@ -6,6 +6,7 @@ current step and previous step. We use the same action within the same control s
 
 import os
 import shutil
+from collections import deque
 
 import gym.spaces as spaces
 import numpy as np
@@ -137,16 +138,36 @@ class EnergyPlusSplitEpisodeWrapper(CostFnWrapper):
     3. If the user touches the true done, yield done.
     """
 
-    def __init__(self, env, max_steps=96 * 5):
+    def __init__(self, env, max_steps=96 * 5, window_length=None):
+        """
+
+        Args:
+            env:
+            max_steps:
+            window_length: None or int. If None, we assume the agent deals with window to save memory.
+                           Otherwise, the environment stores the
+        """
         super(EnergyPlusSplitEpisodeWrapper, self).__init__(env=env)
         assert max_steps > 0, 'max_steps must be greater than zero. Got {}'.format(max_steps)
         self.max_steps = max_steps
         self.true_done = True
         self.last_obs = None
 
+        self.window_length = window_length
+
+        if self.window_length is not None:
+            assert window_length < max_steps, 'window must be less than max_steps'
+            self.prev_states = deque(maxlen=window_length)
+            self.prev_actions = deque(maxlen=window_length - 1)
+
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
-        self.last_obs = obs
+        if self.window_length is None:
+            self.last_obs = obs
+        else:
+            self.prev_states.append(obs)
+            self.prev_actions.append(action)
+
         if done:
             self.true_done = True
             info['true_done'] = True
@@ -163,11 +184,28 @@ class EnergyPlusSplitEpisodeWrapper(CostFnWrapper):
             raise ValueError('Please call reset before step.')
 
     def get_obs(self):
-        return self.last_obs
+        if self.window_length is None:
+            return self.last_obs
+        else:
+            states = np.array(self.prev_states)
+            actions = list(self.prev_actions)
+            actions.insert(0, np.zeros_like(self.action_space.low))
+            actions = np.array(actions)
+            return np.concatenate((states, actions), axis=-1)
 
     def reset(self, **kwargs):
         if self.true_done:
-            self.last_obs = self.env.reset(**kwargs)
+            if self.window_length is None:
+                self.last_obs = self.env.reset(**kwargs)
+            else:
+                # fill the window_length
+                self.last_obs = self.env.reset(**kwargs)
+                for _ in range(self.window_length - 1):
+                    last_action = self.action_space.sample()
+                    self.prev_states.append(self.last_obs)
+                    self.prev_actions.append(last_action)
+                    self.last_obs, reward, done, info = self.env.step(last_action)
+                self.prev_states.append(self.last_obs)
             self.true_done = False
         self.current_steps = 0
         return self.get_obs()

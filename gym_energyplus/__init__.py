@@ -19,7 +19,7 @@ ALL_CITIES = set(ENERGYPLUS_WEATHER_dict.keys())
 
 
 def make_env(cities, temperature_center, temp_tolerance, obs_normalize=True, action_normalize=True,
-             num_days_per_episode=1, log_dir=None):
+             num_days_per_episode=1, window_length=None, log_dir=None):
     env = EnergyPlusEnv(energyplus_file=energyplus_bin_path,
                         model_file=get_model_filepath('temp_fan'),
                         weather_file=get_weather_filepath(cities),
@@ -46,6 +46,6 @@ def make_env(cities, temperature_center, temp_tolerance, obs_normalize=True, act
         env = EnergyPlusGradualActionWrapper(env=env, action_low=action_low, action_high=action_high,
                                              action_delta=action_delta)
 
-    env = EnergyPlusSplitEpisodeWrapper(env, max_steps=96 * num_days_per_episode)
+    env = EnergyPlusSplitEpisodeWrapper(env, max_steps=96 * num_days_per_episode, window_length=window_length)
 
     return env

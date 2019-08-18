@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchlib.common import move_tensor_to_gpu
 from torchlib.deep_rl.algorithm.model_based import DeterministicWorldModel
+from torchlib.deep_rl.models.policy import BasePolicy, _BetaActionHead
 from torchlib.utils.math import normalize, unnormalize
 from tqdm.auto import tqdm
 
@@ -140,3 +141,32 @@ class EnergyPlusDynamicsModel(DeterministicWorldModel):
         predicted_delta_state = unnormalize(predicted_delta_state_normalized, self.delta_state_mean,
                                             self.delta_state_std)
         return states[:, -1, :] + predicted_delta_state
+
+
+class LSTMOutput(nn.Module):
+    def __init__(self, state_dim, action_dim, hidden_size):
+        super(LSTMOutput, self).__init__()
+        self.lstm = nn.LSTM(input_size=state_dim + action_dim, hidden_size=hidden_size, num_layers=1,
+                            batch_first=True, bidirectional=False)
+
+    def forward(self, state):
+        out = self.lstm.forward(state)[0][:, -1, :]
+        return out
+
+
+class EnergyPlusPPOContinuousPolicy(BasePolicy):
+    def __init__(self, state_dim, action_dim, hidden_size):
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+        self.hidden_size = hidden_size
+        super(EnergyPlusPPOContinuousPolicy, self).__init__(recurrent=False, hidden_size=None)
+
+    def _create_feature_extractor(self):
+        return LSTMOutput(self.state_dim, self.action_dim, self.hidden_size)
+
+    def _create_action_head(self, feature_output_size):
+        action_header = _BetaActionHead(feature_output_size, self.action_dim)
+        return action_header
+
+    def _calculate_feature_output_size(self):
+        return self.hidden_size

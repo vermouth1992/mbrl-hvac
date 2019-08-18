@@ -98,6 +98,7 @@ class LSTMImitationModule(nn.Module):
         feature = torch.cat((history_states, history_actions), dim=-1)  # (b, T, 10)
         output, _ = self.lstm.forward(feature)  # (b, hidden_size)
         # output = self.drop_out.forward(output)
+        output = output[:, -1, :]
         output = torch.cat((output, states), dim=-1)
         output = self.linear.forward(output)
         return output

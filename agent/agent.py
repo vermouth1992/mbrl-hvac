@@ -86,7 +86,7 @@ class LSTMImitationModule(nn.Module):
         feature_dim = state_dim + action_dim
         self.lstm = nn.LSTM(input_size=feature_dim, hidden_size=hidden_size, num_layers=1, batch_first=True,
                             bidirectional=False)
-        # self.drop_out = nn.Dropout(0.1)
+        self.drop_out = nn.Dropout(0.5)
         self.linear = nn.Sequential(
             nn.Linear(hidden_size + state_dim, hidden_size),
             nn.ReLU6(),
@@ -97,7 +97,7 @@ class LSTMImitationModule(nn.Module):
     def forward(self, history_states, history_actions, states):
         feature = torch.cat((history_states, history_actions), dim=-1)  # (b, T, 10)
         output, _ = self.lstm.forward(feature)  # (b, hidden_size)
-        # output = self.drop_out.forward(output)
+        output = self.drop_out.forward(output)
         output = output[:, -1, :]
         output = torch.cat((output, states), dim=-1)
         output = self.linear.forward(output)

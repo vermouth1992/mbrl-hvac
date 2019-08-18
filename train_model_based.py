@@ -61,7 +61,7 @@ def train(city=('SF'),
                                              num_random_action_selection=num_random_action_selection,
                                              gamma=gamma)
     if dagger:
-        agent = ModelBasedHistoryDaggerAgent(model=model, planner=planner, policy_data_size=1000,
+        agent = ModelBasedHistoryDaggerAgent(model=model, planner=planner, policy_data_size=10000,
                                              window_length=window_length, baseline_agent=baseline_agent,
                                              state_dim=env.observation_space.shape[0],
                                              action_dim=env.action_space.shape[0],

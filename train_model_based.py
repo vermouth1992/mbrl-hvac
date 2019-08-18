@@ -50,7 +50,8 @@ def train(city=('SF'),
     model = EnergyPlusDynamicsModel(state_dim=env.observation_space.shape[0],
                                     action_dim=env.action_space.shape[0],
                                     hidden_size=32,
-                                    learning_rate=1e-3)
+                                    learning_rate=1e-3,
+                                    log_dir=log_dir)
 
     print('Action space low = {}, high = {}'.format(env.action_space.low, env.action_space.high))
 

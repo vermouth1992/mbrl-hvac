@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.tensorboard import SummaryWriter
 from torchlib.common import move_tensor_to_gpu
 from torchlib.deep_rl.algorithm.model_based import DeterministicWorldModel
 from torchlib.deep_rl.models.policy import BasePolicy, _BetaActionHead
@@ -64,9 +65,12 @@ class EnergyPlusDynamicsModel(DeterministicWorldModel):
     The only difference is that energyplus dynamics model takes in historical states and actions.
     """
 
-    def __init__(self, state_dim=6, action_dim=4, hidden_size=32, learning_rate=1e-3):
+    def __init__(self, state_dim=6, action_dim=4, hidden_size=32, learning_rate=1e-3, log_dir=None):
         dynamics_model = LSTMAttention(state_dim=state_dim, action_dim=action_dim, hidden_size=hidden_size)
         optimizer = torch.optim.Adam(dynamics_model.parameters(), lr=learning_rate)
+
+        self.writer = SummaryWriter(log_dir=log_dir + '/dynamics')
+        self.global_step = 0
 
         super(EnergyPlusDynamicsModel, self).__init__(dynamics_model=dynamics_model, optimizer=optimizer)
 
@@ -117,9 +121,15 @@ class EnergyPlusDynamicsModel(DeterministicWorldModel):
                     val_losses.append(loss.item())
             self.train()
 
+            train_loss = np.mean(losses)
+            val_loss = np.mean(val_losses)
+
             if verbose:
                 t.set_description('Epoch {}/{} - Avg model train loss: {:.4f} - Avg model val loss: {:.4f}'.format(
-                    i + 1, epoch, np.mean(losses), np.mean(val_losses)))
+                    i + 1, epoch, train_loss, val_loss))
+
+            self.writer.add_scalars('dynamics/train_loss', {'train_loss': train_loss,
+                                                            'val_loss': val_loss}, self.global_step)
 
     def predict_next_states(self, states, actions):
         """

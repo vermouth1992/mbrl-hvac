@@ -130,6 +130,7 @@ class EnergyPlusDynamicsModel(DeterministicWorldModel):
 
             self.writer.add_scalars('dynamics/train_loss', {'train_loss': train_loss,
                                                             'val_loss': val_loss}, self.global_step)
+            self.global_step += 1
 
     def predict_next_states(self, states, actions):
         """

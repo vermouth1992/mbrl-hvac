@@ -26,7 +26,6 @@ class PIDAgent(BaseAgent):
         self.low = np.array([self.lo, self.lo, self.flow_lo, self.flow_lo])
         self.high = np.array([self.hi, self.hi, self.flow_hi, self.flow_hi])
 
-
     def predict(self, state):
         delta_west = state[1] - self.target
         act_west = self.target - delta_west * self.sensitivity
@@ -71,7 +70,8 @@ if __name__ == '__main__':
     sensitivity = args['sensitivity']
     alpha = args['alpha']
 
-    log_dir = 'runs/{}_{}_{}_{}_{}_pid'.format(city, temperature_center, temperature_tolerance, sensitivity, alpha)
+    log_dir = 'runs/{}_{}_{}_{}_{}_pid'.format('_'.join(city), temperature_center, temperature_tolerance,
+                                               sensitivity, alpha)
 
     env = make_env(city, temperature_center, temperature_tolerance, obs_normalize=False, action_normalize=False,
                    num_days_per_episode=1, log_dir=log_dir)

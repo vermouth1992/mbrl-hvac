@@ -13,7 +13,7 @@ import numpy as np
 import torch
 from gym.core import Wrapper, ObservationWrapper, ActionWrapper
 from torch.utils.tensorboard import SummaryWriter
-from torchlib.common import convert_numpy_to_tensor
+from torchlib.common import convert_to_tensor
 from torchlib.deep_rl.envs.model_based import ModelBasedEnv
 
 
@@ -265,8 +265,8 @@ class EnergyPlusObsWrapper(ObservationWrapper, CostFnWrapper):
         self.obs_mean = np.array([temperature_center, temperature_center, temperature_center, 1e5, 5000.],
                                  dtype=np.float32)
         self.obs_max = np.array([30., 30., 30., 1e5, 1e4], dtype=np.float32)
-        self.obs_mean_tensor = convert_numpy_to_tensor(self.obs_mean).unsqueeze(dim=0)
-        self.obs_max_tensor = convert_numpy_to_tensor(self.obs_max).unsqueeze(dim=0)
+        self.obs_mean_tensor = convert_to_tensor(self.obs_mean).unsqueeze(dim=0)
+        self.obs_max_tensor = convert_to_tensor(self.obs_max).unsqueeze(dim=0)
 
         self.observation_space = spaces.Box(low=np.array([-1., -1., -1., -10., -10.]),
                                             high=np.array([1., 1., 1., 10.0, 10.0]),

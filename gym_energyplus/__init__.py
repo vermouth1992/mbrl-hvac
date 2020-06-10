@@ -26,7 +26,7 @@ def make_env(cities, temperature_center, temp_tolerance, obs_normalize=True, act
                         config={'temp_center': temperature_center, 'temp_tolerance': temp_tolerance},
                         log_dir=None,
                         verbose=True)
-    env = RepeatAction(env)
+    # env = RepeatAction(env)
 
     assert 365 % num_days_per_episode == 0, '365 must be divisible by num_days_per_episode. Got {}'.format(
         num_days_per_episode)

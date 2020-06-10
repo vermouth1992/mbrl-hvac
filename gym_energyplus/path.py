@@ -11,7 +11,7 @@ elif platform.system() == 'Linux':
 else:
     raise ValueError('Unsupported system {}'.format(platform.system()))
 
-ENERGYPLUS_VERSION = "8-8-0"
+ENERGYPLUS_VERSION = "9-1-0"
 ENERGYPLUS_DIR = os.path.join(energyplus_instdir, 'EnergyPlus-{}'.format(ENERGYPLUS_VERSION))
 
 WEATHER_DIR = os.path.join(ENERGYPLUS_DIR, 'WeatherData')

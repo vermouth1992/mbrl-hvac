@@ -1,4 +1,4 @@
-# Model-based RL for Building HVAC Control
+# Model-based Reinforcement Learning for Building HVAC Control
 
 This repository is the official implementation of [Building HVAC Scheduling Using Reinforcement Learning via Neural Network Based Model Approximation](https://arxiv.org/abs/1910.05313). 
 

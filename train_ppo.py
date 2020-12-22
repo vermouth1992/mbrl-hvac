@@ -72,11 +72,11 @@ if __name__ == '__main__':
 
     policy_optimizer = torch.optim.Adam(policy_net.parameters(), args.learning_rate)
 
-    agent = deep_rl.algorithm.ppo.PPOAgent(policy_net, policy_optimizer,
-                                           init_hidden_unit=None,
-                                           lam=args.gae_lambda,
-                                           clip_param=args.clip_param,
-                                           entropy_coef=args.entropy_coef, value_coef=args.value_coef)
+    agent = deep_rl.algorithm.policy_gradient.ppo.PPOAgent(policy_net, policy_optimizer,
+                                                           init_hidden_unit=None,
+                                                           lam=args.gae_lambda,
+                                                           clip_param=args.clip_param,
+                                                           entropy_coef=args.entropy_coef, value_coef=args.value_coef)
 
     checkpoint_path = 'checkpoint/{}_{}_{}_{}_ppo.ckpt'.format(city, temperature_center,
                                                                args.discount, temperature_tolerance)

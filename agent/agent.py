@@ -5,10 +5,11 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from sklearn.model_selection import train_test_split
-from torchlib.common import convert_to_tensor, move_tensor_to_gpu
+from tqdm.auto import tqdm
+
+from torchlib.common import convert_numpy_to_tensor, move_tensor_to_gpu
 from torchlib.dataset.utils import create_data_loader
 from torchlib.deep_rl.algorithm.model_based import ModelBasedPlanAgent, ModelBasedDAggerAgent, ContinuousImitationPolicy
-from tqdm.auto import tqdm
 
 
 class ModelBasedHistoryPlanAgent(ModelBasedPlanAgent):
@@ -115,9 +116,9 @@ class HistoryImitationPolicy(ContinuousImitationPolicy):
         history_state = np.expand_dims(history_state, axis=0)
         history_action = np.expand_dims(history_action, axis=0)
         with torch.no_grad():
-            state = convert_to_tensor(state)
-            history_state = convert_to_tensor(history_state)
-            history_action = convert_to_tensor(history_action)
+            state = convert_numpy_to_tensor(state)
+            history_state = convert_numpy_to_tensor(history_state)
+            history_action = convert_numpy_to_tensor(history_action)
             state = (state - self.state_mean.squeeze(dim=1)) / self.state_std.squeeze(dim=1)
             history_state = (history_state - self.state_mean) / self.state_std
             action = self.model.forward(history_state, history_action, state)

@@ -7,11 +7,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
+from tqdm.auto import tqdm
+
 from torchlib.common import move_tensor_to_gpu
 from torchlib.deep_rl.algorithm.model_based import DeterministicWorldModel
 from torchlib.deep_rl.models.policy import BasePolicy, _BetaActionHead
 from torchlib.utils.math import normalize, unnormalize
-from tqdm.auto import tqdm
 
 
 class LSTMAttention(nn.Module):
